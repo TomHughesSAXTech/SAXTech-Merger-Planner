@@ -1,11 +1,6 @@
 {
   "routes": [
     {
-      "route": "/api/*",
-      "methods": ["GET", "POST", "PUT", "DELETE"],
-      "allowedRoles": ["anonymous"]
-    },
-    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200

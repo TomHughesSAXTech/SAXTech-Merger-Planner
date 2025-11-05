@@ -1,14 +1,20 @@
-// Azure Functions v2 programming model for Static Web Apps
-module.exports = async function (context, req) {
-    context.log('session-init called');
-    
-    const sessionId = 'test-' + Date.now();
-    
-    // V2 format: set context.res directly
-    context.res = {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: { sessionId, message: 'Test response v2' }
-    };
-};
+const { app } = require('@azure/functions');
+
+// V4 format - function name becomes the route: /api/session-init
+app.http('session-init', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    handler: async (request, context) => {
+        context.log('session-init called');
+        
+        const sessionId = 'test-' + Date.now();
+        
+        return {
+            jsonBody: { 
+                sessionId,
+                message: 'Test response v4' 
+            }
+        };
+    }
+});
 };
