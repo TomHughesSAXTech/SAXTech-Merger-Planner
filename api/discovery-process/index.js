@@ -1,87 +1,79 @@
-const { app } = require('@azure/functions');
 const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
 
-// Azure OpenAI Configuration
-const openAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
-const openAIKey = process.env.AZURE_OPENAI_KEY;
-const deploymentId = process.env.AZURE_OPENAI_DEPLOYMENT;
+module.exports = async function (context, req) {
+    try {
+        const openAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+        const openAIKey = process.env.AZURE_OPENAI_KEY;
+        const deploymentId = process.env.AZURE_OPENAI_DEPLOYMENT;
+        const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
+        const cosmosKey = process.env.COSMOS_KEY;
+        
+        const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
+        const database = cosmosClient.database('MAOnboarding');
+        const container = database.container('Sessions');
+        const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
+        
+        const { sessionId, category, response, currentTree } = req.body;
 
-// Cosmos DB Configuration
-const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
-const cosmosKey = process.env.COSMOS_KEY;
-const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
-const database = cosmosClient.database('MAOnboarding');
-const container = database.container('Sessions');
+        // Store discovery response
+        await storeDiscoveryData(sessionId, category, response, container);
 
-const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
-
-// Discovery Processing Function
-app.http('discovery-process', {
-    methods: ['POST'],
-    authLevel: 'anonymous',
-    route: 'discovery/process',
-    handler: async (request, context) => {
-        const { sessionId, category, response, currentTree } = await request.json();
-
-        try {
-            // Store discovery response
-            await storeDiscoveryData(sessionId, category, response);
-
-            // Generate AI prompt for decision tree generation
-            const prompt = buildDiscoveryPrompt(category, response, currentTree);
-            
-            // Call Azure OpenAI
-            const completion = await openAIClient.getChatCompletions(
-                deploymentId,
-                [
-                    {
-                        role: 'system',
-                        content: getSystemPrompt()
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
+        // Generate AI prompt for decision tree generation
+        const prompt = buildDiscoveryPrompt(category, response, currentTree);
+        
+        // Call Azure OpenAI
+        const completion = await openAIClient.getChatCompletions(
+            deploymentId,
+            [
                 {
-                    temperature: 0.3,
-                    max_tokens: 2000,
-                    functions: [getTreeGenerationFunction()],
-                    function_call: { name: 'generate_decision_nodes' }
+                    role: 'system',
+                    content: getSystemPrompt()
+                },
+                {
+                    role: 'user',
+                    content: prompt
                 }
-            );
+            ],
+            {
+                temperature: 0.3,
+                max_tokens: 2000,
+                functions: [getTreeGenerationFunction()],
+                function_call: { name: 'generate_decision_nodes' }
+            }
+        );
 
-            const functionCall = completion.choices[0].message.functionCall;
-            const treeUpdates = JSON.parse(functionCall.arguments);
+        const functionCall = completion.choices[0].message.functionCall;
+        const treeUpdates = JSON.parse(functionCall.arguments);
 
-            // Process the AI response to create new nodes and edges
-            const { newNodes, newEdges } = processAIResponse(treeUpdates, currentTree);
+        // Process the AI response to create new nodes and edges
+        const { newNodes, newEdges } = processAIResponse(treeUpdates, currentTree);
 
-            // Determine if phase is complete
-            const phaseComplete = checkPhaseCompletion(category, response);
-            const nextPhase = phaseComplete ? getNextPhase(category) : null;
+        // Determine if phase is complete
+        const phaseComplete = checkPhaseCompletion(category, response);
+        const nextPhase = phaseComplete ? getNextPhase(category) : null;
 
-            return {
-                status: 200,
-                jsonBody: {
-                    success: true,
-                    newNodes,
-                    newEdges,
-                    phaseComplete,
-                    nextPhase,
-                    insights: treeUpdates.insights
-                }
-            };
-        } catch (error) {
-            context.log('Error processing discovery:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to process discovery response' }
-            };
-        }
+        context.res = {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                success: true,
+                newNodes,
+                newEdges,
+                phaseComplete,
+                nextPhase,
+                insights: treeUpdates.insights
+            })
+        };
+    } catch (error) {
+        context.log.error('Error processing discovery:', error);
+        context.res = {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Failed to process discovery response', details: error.message })
+        };
     }
-});
+};
 
 function getSystemPrompt() {
     return `You are an AI assistant specializing in M&A IT infrastructure onboarding. 
@@ -256,7 +248,7 @@ function getNextPhase(currentCategory) {
     return currentIndex < phases.length - 1 ? phases[currentIndex + 1] : 'complete';
 }
 
-async function storeDiscoveryData(sessionId, category, response) {
+async function storeDiscoveryData(sessionId, category, response, container) {
     const item = {
         id: sessionId,
         partitionKey: sessionId,
@@ -267,5 +259,3 @@ async function storeDiscoveryData(sessionId, category, response) {
     
     await container.items.upsert(item);
 }
-
-module.exports = { app };

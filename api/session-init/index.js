@@ -7,9 +7,11 @@ module.exports = async function (context, req) {
         const cosmosKey = process.env.COSMOS_KEY;
         
         if (!cosmosEndpoint || !cosmosKey) {
+            context.log.error('Missing Cosmos DB configuration');
             context.res = {
                 status: 500,
-                body: { error: 'Cosmos DB configuration missing' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Cosmos DB configuration missing' })
             };
             return;
         }
@@ -35,13 +37,15 @@ module.exports = async function (context, req) {
         
         context.res = {
             status: 200,
-            body: { sessionId }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId })
         };
     } catch (error) {
         context.log.error('Error initializing session:', error);
         context.res = {
             status: 500,
-            body: { error: 'Failed to initialize session', details: error.message }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Failed to initialize session', details: error.message })
         };
     }
 };

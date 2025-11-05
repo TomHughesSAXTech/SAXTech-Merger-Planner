@@ -76,17 +76,19 @@ module.exports = async function (context, req) {
 
         context.res = {
             status: 200,
-            body: {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 response,
                 discoveryData,
                 categoryComplete
-            }
+            })
         };
     } catch (error) {
         context.log.error('Error processing chat:', error);
         context.res = {
             status: 500,
-            body: { error: 'Failed to process chat message', details: error.message }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Failed to process chat message', details: error.message })
         };
     }
 };
