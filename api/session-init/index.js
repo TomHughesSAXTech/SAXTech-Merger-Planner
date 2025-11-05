@@ -11,7 +11,6 @@ const container = database.container('Sessions');
 app.http('session-init', {
     methods: ['POST'],
     authLevel: 'anonymous',
-    route: 'session/init',
     handler: async (request, context) => {
         try {
             const body = await request.json();

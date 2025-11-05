@@ -24,7 +24,6 @@ const categoryPrompts = {
 app.http('chat-process', {
     methods: ['POST'],
     authLevel: 'anonymous',
-    route: 'chat/process',
     handler: async (request, context) => {
         try {
             const body = await request.json();

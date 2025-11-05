@@ -66,7 +66,7 @@ function App() {
 
   const initializeSession = async () => {
     try {
-      const response = await fetch('/api/session/init', {
+      const response = await fetch('/api/session-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'ma-onboarding' })
@@ -146,7 +146,7 @@ function App() {
   const generateExecutionPlan = async () => {
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/plan/generate', {
+      const response = await fetch('/api/plan-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,7 +181,7 @@ function App() {
 
   const createConnectWiseTickets = async (tickets) => {
     try {
-      const response = await fetch('/api/connectwise/tickets/bulk', {
+      const response = await fetch('/api/connectwise-tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tickets })

@@ -3,7 +3,6 @@ const { app } = require('@azure/functions');
 app.http('connectwise-tickets', {
     methods: ['POST'],
     authLevel: 'anonymous',
-    route: 'connectwise/tickets/bulk',
     handler: async (request, context) => {
         try {
             const body = await request.json();

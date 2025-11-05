@@ -16,7 +16,6 @@ const container = database.container('Sessions');
 app.http('plan-generate', {
     methods: ['POST'],
     authLevel: 'anonymous',
-    route: 'plan/generate',
     handler: async (request, context) => {
         try {
             const body = await request.json();

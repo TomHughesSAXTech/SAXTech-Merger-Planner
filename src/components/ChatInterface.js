@@ -103,7 +103,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
 
     try {
       // Send to Azure Function for processing
-      const response = await fetch('/api/chat/process', {
+                const response = await fetch('/api/chat-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
