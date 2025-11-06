@@ -31,7 +31,7 @@ module.exports = async function (context, req) {
         
         const messages = [
             { role: 'system', content: systemPrompt },
-            ...conversationContext.map(msg => ({ role: msg.role, content: msg.content })),
+            ...(conversationContext || []).map(msg => ({ role: msg.role, content: msg.content })),
             { role: 'user', content: message }
         ];
 

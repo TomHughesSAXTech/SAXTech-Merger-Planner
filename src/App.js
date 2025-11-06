@@ -55,7 +55,7 @@ function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [discoveryData, setDiscoveryData] = useState({});
-  const [currentPhase, setCurrentPhase] = useState('discovery');
+  const [currentPhase, setCurrentPhase] = useState('infrastructure');
   const [sessionId, setSessionId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -98,47 +98,38 @@ function App() {
     }
   };
 
-  const handleDiscoveryResponse = async (category, response) => {
-    setIsProcessing(true);
-    try {
-      const apiResponse = await fetch('/api/discovery/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          category,
-          response,
-          currentTree: { nodes, edges }
-        })
-      });
-      
-      const data = await apiResponse.json();
-      
-      // Update discovery data
+  const handleDiscoveryResponse = (category, data) => {
+    // Update discovery data when chat extracts info
+    if (data && Object.keys(data).length > 0) {
       setDiscoveryData(prev => ({
         ...prev,
-        [category]: response
+        [category]: data
       }));
       
-      // Update decision tree with new nodes and edges
-      if (data.newNodes && data.newEdges) {
-        const updatedNodes = [...nodes, ...data.newNodes];
-        const updatedEdges = [...edges, ...data.newEdges];
-        
-        // Apply automatic layout
-        const layouted = getLayoutedElements(updatedNodes, updatedEdges);
-        setNodes(layouted.nodes);
-        setEdges(layouted.edges);
-      }
+      // Add node to the tree for this category
+      const newNode = {
+        id: `${category}-node`,
+        data: { 
+          label: category.charAt(0).toUpperCase() + category.slice(1),
+          status: 'completed',
+          description: `${Object.keys(data).length} items discovered`
+        },
+        position: { x: 0, y: 0 }
+      };
       
-      // Check if we should move to next phase
-      if (data.phaseComplete) {
-        setCurrentPhase(data.nextPhase);
-      }
-    } catch (error) {
-      console.error('Failed to process discovery response:', error);
-    } finally {
-      setIsProcessing(false);
+      const newEdge = {
+        id: `root-${category}`,
+        source: 'root',
+        target: `${category}-node`,
+        animated: true
+      };
+      
+      const updatedNodes = [...nodes.filter(n => n.id !== newNode.id), newNode];
+      const updatedEdges = [...edges.filter(e => e.id !== newEdge.id), newEdge];
+      
+      const layouted = getLayoutedElements(updatedNodes, updatedEdges);
+      setNodes(layouted.nodes);
+      setEdges(layouted.edges);
     }
   };
 
