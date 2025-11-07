@@ -47,29 +47,39 @@ module.exports = async function (context, req) {
             { role: 'assistant', content: response, timestamp: new Date().toISOString() }
         );
 
+        // Extract discovery data incrementally from every user response
         let discoveryData = null;
         let categoryComplete = false;
 
+        // Always try to extract data from recent conversation
+        const extractionMessages = [
+            { role: 'system', content: `Extract any factual ${category} information from the user's latest response. Return ONLY a JSON object with discovered facts. If no new facts, return {}.` },
+            { role: 'user', content: `Latest response: ${message}\n\nPrevious context: ${conversationContext?.slice(-3).map(m => m.content).join(' ') || ''}` }
+        ];
+
+        try {
+            const extractionResult = await openAIClient.getChatCompletions(deploymentName, extractionMessages, {
+                maxTokens: 300,
+                temperature: 0.2
+            });
+
+            const extracted = JSON.parse(extractionResult.choices[0].message.content);
+            if (extracted && Object.keys(extracted).length > 0) {
+                // Merge with existing category data
+                session.discoveryData[category] = {
+                    ...(session.discoveryData[category] || {}),
+                    ...extracted
+                };
+                discoveryData = session.discoveryData[category];
+            }
+        } catch (parseError) {
+            context.log.error('Failed to parse discovery data:', parseError);
+        }
+
+        // Check if user wants to move to next category
         if (message.toLowerCase().includes('done') || message.toLowerCase().includes('complete') || 
             message.toLowerCase().includes('finished') || message.toLowerCase().includes('next')) {
             categoryComplete = true;
-            
-            const extractionMessages = [
-                { role: 'system', content: `Extract structured discovery data from this conversation about ${category}. Return JSON only.` },
-                { role: 'user', content: JSON.stringify(session.messages.filter(m => m.role === 'user' || m.role === 'assistant')) }
-            ];
-
-            const extractionResult = await openAIClient.getChatCompletions(deploymentName, extractionMessages, {
-                maxTokens: 800,
-                temperature: 0.3
-            });
-
-            try {
-                discoveryData = JSON.parse(extractionResult.choices[0].message.content);
-                session.discoveryData[category] = discoveryData;
-            } catch (parseError) {
-                context.log.error('Failed to parse discovery data:', parseError);
-            }
         }
 
         await container.item(sessionId, sessionId).replace(session);
