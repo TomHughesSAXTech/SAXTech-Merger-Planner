@@ -53,7 +53,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
     // Load configuration on mount
     const loadConfig = async () => {
       try {
-        const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/admin-config-get');
+        const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
         if (response.ok) {
           const data = await response.json();
           setConfig(data);
