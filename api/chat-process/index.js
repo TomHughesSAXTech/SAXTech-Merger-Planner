@@ -35,15 +35,15 @@ module.exports = async function (context, req) {
         const database = cosmosClient.database('MAOnboarding');
         const container = database.container('Sessions');
         
+        const body = req.body;
+        const { sessionId, message, category, context: conversationContext } = body;
+        
         // Load configuration from Cosmos DB
         const config = await loadConfig(cosmosClient);
         
         // Get category prompts from config or use defaults
         const categoryConfig = config?.categories?.find(c => c.id === category);
         const systemPrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
-        
-        const body = req.body;
-        const { sessionId, message, category, context: conversationContext } = body;
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
         
