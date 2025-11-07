@@ -60,11 +60,24 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAdmin, setShowAdmin] = useState(window.location.pathname === '/admin');
+  const [config, setConfig] = useState(null);
 
   useEffect(() => {
     // Initialize session
     initializeSession();
+    // Load configuration
+    loadConfig();
   }, []);
+
+  const loadConfig = async () => {
+    try {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/admin-config-get');
+      const data = await response.json();
+      setConfig(data);
+    } catch (error) {
+      console.error('Failed to load config:', error);
+    }
+  };
 
   const initializeSession = async () => {
     console.log('[DEBUG] Initializing session...');

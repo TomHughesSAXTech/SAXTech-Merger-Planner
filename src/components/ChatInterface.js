@@ -7,9 +7,11 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('infrastructure');
+  const [config, setConfig] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const discoveryQuestions = {
+  // Default questions (fallback if config not available)
+  const defaultDiscoveryQuestions = {
     infrastructure: [
       "How many physical servers are currently in use?",
       "What virtualization platform is being used (VMware, Hyper-V, etc.)?",
@@ -48,6 +50,22 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   };
 
   useEffect(() => {
+    // Load configuration on mount
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/admin-config-get');
+        if (response.ok) {
+          const data = await response.json();
+          setConfig(data);
+        }
+      } catch (error) {
+        console.error('Failed to load config, using defaults:', error);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  useEffect(() => {
     // Initialize with welcome message
     if (messages.length === 0 && sessionId) {
       addMessage({
@@ -76,7 +94,10 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   };
 
   const askNextQuestion = () => {
-    const questions = discoveryQuestions[currentCategory];
+    // Get questions from config or use defaults
+    const categoryConfig = config?.categories?.find(c => c.id === currentCategory);
+    const questions = categoryConfig?.questions || defaultDiscoveryQuestions[currentCategory];
+    
     if (questions && questions.length > 0) {
       const nextQuestion = questions[0]; // In production, track which questions have been asked
       addMessage({
@@ -130,7 +151,8 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
 
       // Check if we should move to next category
       if (data.categoryComplete) {
-        const categories = Object.keys(discoveryQuestions);
+        // Get categories from config or use defaults
+        const categories = config?.categories?.map(c => c.id) || Object.keys(defaultDiscoveryQuestions);
         const currentIndex = categories.indexOf(currentCategory);
         if (currentIndex < categories.length - 1) {
           setCurrentCategory(categories[currentIndex + 1]);
@@ -165,6 +187,13 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   };
 
   const getQuickActions = () => {
+    // Get quick actions from config or use defaults
+    const categoryConfig = config?.categories?.find(c => c.id === currentCategory);
+    if (categoryConfig?.quickActions) {
+      return categoryConfig.quickActions;
+    }
+    
+    // Default quick actions
     switch (currentCategory) {
       case 'infrastructure':
         return ['Skip to Applications', 'Upload Infrastructure Diagram', 'Import from CSV'];

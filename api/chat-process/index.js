@@ -1,13 +1,26 @@
 const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
 
-const categoryPrompts = {
+// Default category prompts (fallback if config not available)
+const defaultCategoryPrompts = {
     infrastructure: 'You are an IT infrastructure discovery assistant. Ask about network topology, servers, storage, virtualization platforms, and legacy systems. Extract key infrastructure details.',
     application: 'You are an application portfolio discovery assistant. Ask about business applications, ERP/CRM systems, custom applications, dependencies, integration points, and licensing. Extract application inventory details.',
     data: 'You are a data discovery assistant. Ask about database systems, data volume, backup and recovery processes, compliance requirements, and unstructured data. Extract data landscape details.',
     security: 'You are a security discovery assistant. Ask about firewalls, compliance frameworks, identity management, security policies, and recent incidents. Extract security posture details.',
     communication: 'You are a communication systems discovery assistant. Ask about email systems, phone systems, collaboration tools, and user migration requirements. Extract communication infrastructure details.'
 };
+
+async function loadConfig(cosmosClient) {
+    try {
+        const database = cosmosClient.database('MAOnboarding');
+        const container = database.container('Configurations');
+        const { resource: config } = await container.item('discovery_config', 'discovery_config').read();
+        return config.data;
+    } catch (error) {
+        // Return null if config doesn't exist yet
+        return null;
+    }
+}
 
 module.exports = async function (context, req) {
     try {
@@ -22,12 +35,17 @@ module.exports = async function (context, req) {
         const database = cosmosClient.database('MAOnboarding');
         const container = database.container('Sessions');
         
+        // Load configuration from Cosmos DB
+        const config = await loadConfig(cosmosClient);
+        
+        // Get category prompts from config or use defaults
+        const categoryConfig = config?.categories?.find(c => c.id === category);
+        const systemPrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
+        
         const body = req.body;
         const { sessionId, message, category, context: conversationContext } = body;
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
-        
-        const systemPrompt = categoryPrompts[category] || 'You are an M&A onboarding assistant.';
         
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -51,9 +69,12 @@ module.exports = async function (context, req) {
         let discoveryData = null;
         let categoryComplete = false;
 
+        // Get extraction prompt from config or use default
+        const extractionPrompt = categoryConfig?.extractionPrompt || `Extract any factual ${category} information from the user's latest response. Return ONLY a JSON object with discovered facts. If no new facts, return {}.`;
+        
         // Always try to extract data from recent conversation
         const extractionMessages = [
-            { role: 'system', content: `Extract any factual ${category} information from the user's latest response. Return ONLY a JSON object with discovered facts. If no new facts, return {}.` },
+            { role: 'system', content: extractionPrompt },
             { role: 'user', content: `Latest response: ${message}\n\nPrevious context: ${conversationContext?.slice(-3).map(m => m.content).join(' ') || ''}` }
         ];
 
@@ -76,10 +97,23 @@ module.exports = async function (context, req) {
             context.log.error('Failed to parse discovery data:', parseError);
         }
 
-        // Check if user wants to move to next category
-        if (message.toLowerCase().includes('done') || message.toLowerCase().includes('complete') || 
-            message.toLowerCase().includes('finished') || message.toLowerCase().includes('next')) {
-            categoryComplete = true;
+        // Check completion based on config criteria or default keywords
+        const completionCriteria = categoryConfig?.completionCriteria;
+        if (completionCriteria) {
+            const factCount = Object.keys(session.discoveryData[category] || {}).length;
+            const hasRequiredFields = completionCriteria.requiredFields?.every(field => 
+                session.discoveryData[category]?.[field]
+            ) ?? true;
+            
+            if (factCount >= (completionCriteria.minFacts || 3) && hasRequiredFields) {
+                categoryComplete = true;
+            }
+        } else {
+            // Fallback to keyword detection
+            if (message.toLowerCase().includes('done') || message.toLowerCase().includes('complete') || 
+                message.toLowerCase().includes('finished') || message.toLowerCase().includes('next')) {
+                categoryComplete = true;
+            }
         }
 
         await container.item(sessionId, sessionId).replace(session);
