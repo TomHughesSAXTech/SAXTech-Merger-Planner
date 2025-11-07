@@ -14,6 +14,7 @@ import dagre from 'dagre';
 import { MessageSquare, GitBranch, Download, Play } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import DiscoveryPanel from './components/DiscoveryPanel';
+import AdminPanel from './components/AdminPanel';
 import './App.css';
 
 const dagreGraph = new dagre.graphlib.Graph();
@@ -58,6 +59,7 @@ function App() {
   const [currentPhase, setCurrentPhase] = useState('infrastructure');
   const [sessionId, setSessionId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(window.location.pathname === '/admin');
 
   useEffect(() => {
     // Initialize session
@@ -218,6 +220,11 @@ function App() {
       </div>
     )
   };
+
+  // Handle admin route
+  if (showAdmin) {
+    return <AdminPanel />;
+  }
 
   return (
     <div className="app-container">

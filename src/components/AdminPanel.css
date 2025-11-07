@@ -1,0 +1,378 @@
+.admin-panel {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #f5f7fa;
+  min-height: 100vh;
+}
+
+.admin-panel.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.admin-header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.8rem;
+  color: #2c3e50;
+}
+
+.btn-save {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.admin-tabs button {
+  padding: 0.75rem 1.5rem;
+  background: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.admin-tabs button.active {
+  background: #3498db;
+  color: white;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+.admin-content {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+}
+
+.tab-header h2 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add:hover {
+  background: #229954;
+  transform: translateY(-1px);
+}
+
+.category-card {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.category-header {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.category-name {
+  flex: 1;
+  font-size: 1.3rem;
+  font-weight: 600;
+  padding: 0.5rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  background: white;
+}
+
+.category-id {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.category-description {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.btn-delete {
+  padding: 0.5rem;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #c0392b;
+}
+
+.questions-section, .actions-section {
+  margin-top: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #34495e;
+}
+
+.btn-add-small {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add-small:hover {
+  background: #2980b9;
+}
+
+.question-row, .action-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.question-row input, .action-row input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.btn-delete-small {
+  padding: 0.5rem;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-small:hover {
+  background: #c0392b;
+}
+
+.extraction-tab {
+  max-width: 900px;
+}
+
+.tab-description {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.extraction-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.extraction-card h3 {
+  margin: 0 0 1rem 0;
+  color: #2c3e50;
+}
+
+.extraction-card label {
+  display: block;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+  color: #34495e;
+}
+
+.extraction-card textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+.completion-criteria {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.criteria-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.criteria-field input {
+  padding: 0.5rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+}
+
+.settings-tab {
+  max-width: 700px;
+}
+
+.settings-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-card h3 {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+}
+
+.settings-card p {
+  color: #666;
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.weight-row label {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.weight-row input {
+  width: 100px;
+  padding: 0.5rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.setting-field {
+  margin-bottom: 1.5rem;
+}
+
+.setting-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #34495e;
+}
+
+.setting-field select, .setting-field input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 1rem;
+}
