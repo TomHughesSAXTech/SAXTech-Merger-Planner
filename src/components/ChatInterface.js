@@ -6,7 +6,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState('infrastructure');
+  const [currentCategory, setCurrentCategory] = useState(null);
   const [config, setConfig] = useState(null);
   const messagesEndRef = useRef(null);
 
@@ -57,9 +57,18 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
         if (response.ok) {
           const data = await response.json();
           setConfig(data);
+          // Set initial category from config or fallback to infrastructure
+          if (data?.config?.categories?.length > 0) {
+            setCurrentCategory(data.config.categories[0].id);
+          } else if (!currentCategory) {
+            setCurrentCategory('infrastructure');
+          }
         }
       } catch (error) {
         console.error('Failed to load config, using defaults:', error);
+        if (!currentCategory) {
+          setCurrentCategory('infrastructure');
+        }
       }
     };
     loadConfig();
@@ -67,10 +76,11 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
 
   useEffect(() => {
     // Initialize with welcome message
-    if (messages.length === 0 && sessionId) {
+    if (messages.length === 0 && sessionId && currentCategory) {
+      const categoryName = config?.config?.categories?.find(c => c.id === currentCategory)?.name || currentCategory;
       addMessage({
         role: 'assistant',
-        content: `Welcome to the M&A IT Discovery Assistant! I'll help you map out the complete IT infrastructure for the acquisition. Let's start with ${currentCategory} discovery.`,
+        content: `Welcome to the M&A IT Discovery Assistant! I'll help you map out the complete IT infrastructure for the acquisition. Let's start with ${categoryName} discovery.`,
         timestamp: new Date().toISOString()
       });
       
@@ -79,7 +89,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
         askNextQuestion();
       }, 1500);
     }
-  }, [sessionId]);
+  }, [sessionId, currentCategory]);
 
   useEffect(() => {
     scrollToBottom();
@@ -94,9 +104,11 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   };
 
   const askNextQuestion = () => {
+    if (!currentCategory) return;
+    
     // Get questions from config or use defaults
-    const categoryConfig = config?.categories?.find(c => c.id === currentCategory);
-    const questions = categoryConfig?.questions || defaultDiscoveryQuestions[currentCategory];
+    const categoryConfig = config?.config?.categories?.find(c => c.id === currentCategory);
+    const questions = categoryConfig?.questions || defaultDiscoveryQuestions[currentCategory] || [];
     
     if (questions && questions.length > 0) {
       const nextQuestion = questions[0]; // In production, track which questions have been asked
@@ -152,14 +164,17 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
       // Check if we should move to next category
       if (data.categoryComplete) {
         // Get categories from config or use defaults
-        const categories = config?.categories?.map(c => c.id) || Object.keys(defaultDiscoveryQuestions);
+        const categories = config?.config?.categories?.map(c => c.id) || Object.keys(defaultDiscoveryQuestions);
         const currentIndex = categories.indexOf(currentCategory);
         if (currentIndex < categories.length - 1) {
-          setCurrentCategory(categories[currentIndex + 1]);
+          const nextCatId = categories[currentIndex + 1];
+          const nextCatConfig = config?.config?.categories?.find(c => c.id === nextCatId);
+          const nextCatName = nextCatConfig?.name || nextCatId;
+          setCurrentCategory(nextCatId);
           setTimeout(() => {
             addMessage({
               role: 'assistant',
-              content: `Great! Now let's move on to ${categories[currentIndex + 1]} discovery.`,
+              content: `Great! Now let's move on to ${nextCatName} discovery.`,
               timestamp: new Date().toISOString()
             });
             askNextQuestion();
@@ -187,9 +202,11 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
   };
 
   const getQuickActions = () => {
+    if (!currentCategory) return [];
+    
     // Get quick actions from config or use defaults
-    const categoryConfig = config?.categories?.find(c => c.id === currentCategory);
-    if (categoryConfig?.quickActions) {
+    const categoryConfig = config?.config?.categories?.find(c => c.id === currentCategory);
+    if (categoryConfig?.quickActions && categoryConfig.quickActions.length > 0) {
       return categoryConfig.quickActions;
     }
     
@@ -214,7 +231,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
     <div className="chat-interface">
       <div className="chat-header">
         <Bot className="chat-icon" />
-        <span>AI Discovery Assistant - {currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1)}</span>
+        <span>AI Discovery Assistant{currentCategory ? ` - ${config?.config?.categories?.find(c => c.id === currentCategory)?.name || currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1)}` : ''}</span>
       </div>
 
       <div className="messages-container">
