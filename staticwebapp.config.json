@@ -1,6 +1,11 @@
 {
   "routes": [
     {
+      "route": "/sax-ma-sow-builder.html",
+      "serve": "/sax-ma-sow-builder.html",
+      "statusCode": 200
+    },
+    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
