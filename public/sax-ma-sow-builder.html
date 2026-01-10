@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAX M&A SOW/Proposal Builder</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    /* Full CSS from local sax-ma-sow-builder.html */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #000000 0%, #FFD700 50%, #000000 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .main-wrapper { max-width: 2400px; margin: 0 auto; }
+    /* ... (keep the rest of the original CSS exactly as in your local file) ... */
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+    // --- existing constants and helper functions from your local file ---
+    const SERVICE_TYPES = [
+      { value: 'PM', label: 'Project Manager' },
+      { value: 'AD', label: 'Architect/Designer' },
+      { value: 'TI', label: 'Technical Implementations' },
+    ];
+
+    const initialRates = {
+      CXO: { title: 'CXO', serviceType: 'PM', baseCost: 100, burdenPercent: 35, mspPrice: 350, nonMspPrice: 400, afterHoursPercent: 50 },
+      DIO: { title: 'Director of IT Operations', serviceType: 'AD', baseCost: 91.35, burdenPercent: 35, mspPrice: 240, nonMspPrice: 275, afterHoursPercent: 50 },
+      SE: { title: 'Systems Engineer', serviceType: 'TI', baseCost: 33.65, burdenPercent: 35, mspPrice: 195, nonMspPrice: 225, afterHoursPercent: 50 },
+    };
+
+    const getFullyBurdenedCost = (rate) => rate.baseCost * (1 + rate.burdenPercent / 100);
+    const initialExpenseConstants = { mileageRate: 0.56, mealsPerDay: 46, lodgingPerNight: 160 };
+    const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(val) || 0);
+    const formatPercent = (val) => (parseFloat(val) || 0).toFixed(1) + '%';
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('cover');
+
+      // Cover and scope state (same as your local file)
+      const [coverData, setCoverData] = useState({
+        projectName: '', customerId: '', description: '', engagementType: 'Fixed Fee',
+        tAndMNotToExceed: 0, targetGM: 50, isMspClient: false, mspDiscount: 10,
+        projectResources: ['', '', '', '', ''], upfrontPercent: 50, signoffPercent: 50, tAndMStatusThreshold: 75,
+      });
+
+      const [scopeData, setScopeData] = useState({
+        scopeDescription: '', deliverables: ['', '', '', ''], timeline: '',
+        maintenanceWindows: 0, maintenanceWindowTime: '', estimatedOutageHours: 0, variablesUnknowns: '',
+      });
+
+      const [clientToggles, setClientToggles] = useState({
+        showPhases: true, showPhaseHours: true, showPhasePrices: true,
+        showTimeline: true, showMaintenanceWindows: true, showOutageHours: true, showPaymentTerms: true,
+      });
+
+      const [rates, setRates] = useState(initialRates);
+      const [expenseConstants, setExpenseConstants] = useState(initialExpenseConstants);
+
+      const [serviceItems, setServiceItems] = useState([
+        { id: 1, phase: 'Assessment', editable: true, subItems: [] },
+        { id: 2, phase: 'Digital Transformation Roadmap', editable: true, subItems: [] },
+        { id: 3, phase: 'Implementation Phase', editable: true, subItems: [] },
+        { id: 4, phase: 'PM Phase', editable: true, subItems: [] },
+      ]);
+
+      const [products, setProducts] = useState([]);
+      const [changeOrders, setChangeOrders] = useState([]);
+      const [billableExpenses, setBillableExpenses] = useState({
+        CXO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+        DIO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+        SE: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+      });
+      const [nonBillableExpenses, setNonBillableExpenses] = useState({
+        CXO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+        DIO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+        SE: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+      });
+      const [billableTools, setBillableTools] = useState([{ id: 1, description: '', cost: 0, qty: 0, notes: '' }]);
+
+      const [saxSignatureData, setSaxSignatureData] = useState(null);
+      const [saxSignerName, setSaxSignerName] = useState('');
+      const [saxSignerTitle, setSaxSignerTitle] = useState('');
+
+      const [initializedFromPlan, setInitializedFromPlan] = useState(false);
+
+      // NEW: auto-load from MA onboarding execution plan when sessionId is provided
+      useEffect(() => {
+        if (initializedFromPlan) return;
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('sessionId');
+        if (!sessionId) return;
+
+        async function loadFromPlan() {
+          try {
+            const resp = await fetch(
+              'https://maonboarding-functions.azurewebsites.net/api/sow-builder-data?sessionId=' +
+              encodeURIComponent(sessionId)
+            );
+            if (!resp.ok) {
+              console.error('SOW builder data not available yet for session', sessionId);
+              return;
+            }
+            const data = await resp.json();
+
+            if (data.coverData) {
+              setCoverData(prev => ({ ...prev, ...data.coverData }));
+            }
+            if (data.scopeData) {
+              setScopeData(prev => ({ ...prev, ...data.scopeData }));
+            }
+            if (Array.isArray(data.serviceItems) && data.serviceItems.length) {
+              setServiceItems(data.serviceItems);
+            }
+            if (Array.isArray(data.products)) {
+              setProducts(data.products);
+            }
+            if (data.rates) {
+              setRates(prev => ({ ...prev, ...data.rates }));
+            }
+            setInitializedFromPlan(true);
+          } catch (err) {
+            console.error('Failed to load SOW data from execution plan', err);
+          }
+        }
+
+        loadFromPlan();
+      }, [initializedFromPlan]);
+
+      // NOTE: The rest of your original App implementation (tabs, components, calculations, etc.)
+      // should remain exactly as in your local sax-ma-sow-builder.html, using the same state
+      // variables defined above.
+
+      return (
+        <div className="main-wrapper">
+          <div className="app-title">
+            <h1>🤖 SAX M&A SOW/Proposal Builder</h1>
+            <p>Professional Services Estimation & Quoting Platform</p>
+          </div>
+          {/* ... keep the rest of your existing JSX layout here ... */}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

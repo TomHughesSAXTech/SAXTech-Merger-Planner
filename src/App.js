@@ -59,7 +59,10 @@ function App() {
   const [currentPhase, setCurrentPhase] = useState('infrastructure');
   const [sessionId, setSessionId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(window.location.pathname === '/admin');
+  const [showAdmin, setShowAdmin] = useState(
+    window.location.pathname === '/admin' ||
+    window.location.pathname === '/admin.html'
+  );
   const [config, setConfig] = useState(null);
 
   useEffect(() => {
@@ -253,6 +256,18 @@ function App() {
           </button>
           <button onClick={exportTree} className="btn btn-secondary">
             <Download className="inline" /> Export
+          </button>
+          <button
+            onClick={() => {
+              if (sessionId) {
+                window.open(`/sax-ma-sow-builder.html?sessionId=${sessionId}`, '_blank');
+              } else {
+                window.open('/sax-ma-sow-builder.html', '_blank');
+              }
+            }}
+            className="btn btn-secondary"
+          >
+            SOW Builder
           </button>
         </div>
       </header>

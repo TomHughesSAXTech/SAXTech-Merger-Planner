@@ -22,26 +22,52 @@ module.exports = async function (context, req) {
         const planPrompt = `
 Based on this M&A onboarding discovery data and decision tree, generate a detailed execution plan.
 
-Discovery Data:
+Discovery Data (JSON):
 ${JSON.stringify(discoveryData, null, 2)}
 
 Decision Tree Summary:
 ${decisionTree.nodes.length} nodes, ${decisionTree.edges.length} edges
 
 Generate an execution plan with:
-1. Phases (Sequential high-level stages)
+1. Phases (sequential high-level stages)
 2. Tasks within each phase with dependencies
 3. Resource requirements
 4. Estimated timeline
 5. Risk factors
 6. ConnectWise ticket structure
 
-Return JSON with:
+Return STRICT JSON with this shape (no comments, no extra fields):
 {
-  "phases": [{"id": "phase1", "name": "Planning", "tasks": [...]}],
-  "timeline": {"totalDays": 90, "milestones": [...]},
-  "risks": [...],
-  "connectwiseTickets": [{"title": "...", "description": "...", "type": "...", "priority": "..."}]
+  "phases": [
+    {
+      "id": "phase1",
+      "name": "Planning",
+      "description": "high level description of the phase",
+      "tasks": [
+        {
+          "name": "Identify all line-of-business systems",
+          "description": "1–2 sentence summary of the task",
+          "hours": 8,
+          "role": "SE | DIO | CXO",
+          "dependencies": ["optional-other-task-ids"],
+          "risk": "low | medium | high | critical"
+        }
+      ]
+    }
+  ],
+  "timeline": {
+    "totalDays": 90,
+    "milestones": [
+      { "name": "Assessment complete", "day": 15 },
+      { "name": "Cutover", "day": 60 }
+    ]
+  },
+  "risks": [
+    { "description": "...", "impact": "low | medium | high | critical", "mitigation": "..." }
+  ],
+  "connectwiseTickets": [
+    { "title": "...", "description": "...", "type": "project | task | change", "priority": "low | medium | high" }
+  ]
 }`;
 
         const completion = await openAIClient.getChatCompletions(deploymentName, [
