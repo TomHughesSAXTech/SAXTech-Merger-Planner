@@ -11,93 +11,702 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <style>
-    /* Full CSS from local sax-ma-sow-builder.html */
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #000000 0%, #FFD700 50%, #000000 100%);
       padding: 20px;
       min-height: 100vh;
     }
+    
     .main-wrapper { max-width: 2400px; margin: 0 auto; }
-    /* ... (keep the rest of the original CSS exactly as in your local file) ... */
+    
+    .app-title {
+      text-align: center;
+      color: white;
+      margin-bottom: 15px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .app-title h1 { font-size: 1.8em; margin-bottom: 5px; }
+    .app-title p { font-size: 0.95em; opacity: 0.9; }
+    
+    .nav-tabs {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 0;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    
+    .nav-tab {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 10px 10px 0 0;
+      font-size: 0.85em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #495057;
+      position: relative;
+      z-index: 10;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    
+    .nav-tab:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateY(-2px);
+    }
+    
+    .nav-tab.active {
+      background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+      color: white;
+      transform: translateY(0px);
+      box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+    }
+    
+    .container {
+      background: white;
+      border-radius: 0 0 15px 15px;
+      box-shadow: 0 10px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      display: none;
+    }
+    
+    .container.active { display: block; }
+    
+    .header {
+      background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+      color: white;
+      padding: 20px 25px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .header h1 { font-size: 1.8em; margin-bottom: 5px; }
+    .header p { font-size: 0.95em; opacity: 0.9; }
+    
+    .robot-icon {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 2.5em;
+      opacity: 0.3;
+    }
+    
+    .content-area { padding: 25px; }
+    
+    .warning-banner {
+      background: #fff3cd;
+      color: #856404;
+      padding: 10px;
+      text-align: center;
+      font-weight: 600;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #2d3436;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid #FFD700;
+    }
+    
+    .subsection-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #2d3436;
+      margin: 25px 0 15px 0;
+      padding: 10px 15px;
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      border-radius: 6px;
+    }
+    
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: #495057;
+    }
+    
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 9px 11px;
+      border: 2px solid #dee2e6;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+    }
+    
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: #FFD700;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 0.85rem;
+    }
+    
+    th {
+      background: #2d3436;
+      color: white;
+      padding: 10px 6px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    
+    tr:nth-child(even) { background: #f8f9fa; }
+    tr:hover { background: #fff3cd; }
+    
+    .phase-header {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
+    }
+    
+    .phase-header td {
+      padding: 10px 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    
+    .totals-row {
+      background: #2d3436 !important;
+      color: white !important;
+    }
+    
+    .totals-row td { border: none; font-weight: 600; }
+    
+    .grand-totals-row {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    
+    .currency { text-align: right; font-family: 'Courier New', monospace; }
+    .number { text-align: center; }
+    
+    input[type="number"] {
+      width: 70px;
+      padding: 5px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      text-align: right;
+    }
+    
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #FFD700;
+      box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+    }
+    
+    select {
+      padding: 5px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+    }
+    
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+    
+    .summary-card {
+      background: white;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-left: 4px solid #FFD700;
+    }
+    
+    .summary-card.highlight {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      border-left-color: #2d3436;
+    }
+    
+    .summary-card-label {
+      font-size: 0.75rem;
+      color: #6c757d;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    
+    .summary-card.highlight .summary-card-label { color: #2d3436; }
+    
+    .summary-card-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #2d3436;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 0.9rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      color: #2d3436;
+    }
+    
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,215,0,0.4); }
+    
+    .btn-secondary {
+      background: #2d3436;
+      color: white;
+    }
+    
+    .btn-secondary:hover { background: #000; }
+    
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+    }
+    
+    .inline-edit {
+      background: transparent;
+      border: 1px dashed #ced4da;
+      padding: 4px 6px;
+      border-radius: 4px;
+      width: 100%;
+    }
+    
+    .inline-edit:hover { border-color: #FFD700; }
+    .inline-edit:focus { outline: none; border: 1px solid #FFD700; background: white; }
+    
+    .add-row-btn {
+      background: transparent;
+      border: 2px dashed #FFD700;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #856404;
+      font-weight: 600;
+      transition: all 0.2s;
+      margin-top: 8px;
+      font-size: 0.85rem;
+    }
+    
+    .add-row-btn:hover { background: #fff3cd; }
+    
+    .config-section {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 2px solid #dee2e6;
+    }
+    
+    .config-section h3 {
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #FFD700;
+      color: #2d3436;
+      font-size: 1.1rem;
+    }
+    
+    .preview-document {
+      background: white;
+      border: 1px solid #dee2e6;
+      padding: 35px;
+      margin: 0 auto;
+      max-width: 900px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .preview-header {
+      text-align: center;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #2d3436;
+    }
+    
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+    }
+    
+    .preview-table th {
+      background: #2d3436;
+      color: white;
+      padding: 8px;
+      text-align: left;
+    }
+    
+    .preview-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    
+    .signature-section {
+      margin-top: 35px;
+      padding: 25px;
+      border: 2px solid #2d3436;
+      border-radius: 10px;
+    }
+    
+    .signature-box {
+      border: 1px solid #9ca3af;
+      border-radius: 4px;
+      background: #f9fafb;
+      height: 70px;
+      cursor: crosshair;
+      display: block;
+    }
+    
+    .tm-notice, .fixed-fee-notice {
+      background: #e3f2fd;
+      border: 2px solid #1976d2;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 0.9rem;
+    }
+    
+    .fixed-fee-notice {
+      background: #e8f5e9;
+      border-color: #388e3c;
+    }
+    
+    .toggle-panel {
+      background: #f8f9fa;
+      border: 2px solid #dee2e6;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .toggle-panel h4 {
+      margin-bottom: 12px;
+      color: #2d3436;
+      font-size: 1rem;
+    }
+    
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+      font-size: 0.85rem;
+    }
+    
+    .toggle-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+    
+    .payment-summary {
+      background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 15px 0;
+    }
+    
+    .payment-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .payment-row:last-child { border-bottom: none; }
+    
+    .payment-row.total {
+      font-size: 1.2em;
+      font-weight: 700;
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      color: #2d3436;
+      margin: 12px -20px -20px -20px;
+      padding: 15px 20px;
+      border-radius: 0 0 10px 10px;
+    }
+    
+    .change-order-badge {
+      background: #e74c3c;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.7em;
+      margin-left: 6px;
+    }
+    
+    .export-bar {
+      background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .export-bar span {
+      color: white;
+      font-weight: 600;
+      margin-right: 10px;
+    }
+    
+    @media print {
+      body { background: white !important; padding: 0 !important; }
+      .nav-tabs, .header, .btn, .add-row-btn, .toggle-panel, .export-bar, .app-title { display: none !important; }
+      .container { box-shadow: none !important; }
+      .preview-document { box-shadow: none !important; max-width: none !important; padding: 15px !important; }
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
-
+  
   <script type="text/babel">
     const { useState, useEffect, useCallback, useMemo, useRef } = React;
-
-    // --- existing constants and helper functions from your local file ---
+    
+    // Service Types
     const SERVICE_TYPES = [
       { value: 'PM', label: 'Project Manager' },
       { value: 'AD', label: 'Architect/Designer' },
       { value: 'TI', label: 'Technical Implementations' },
     ];
-
+    
+    // Initial rate structure
     const initialRates = {
       CXO: { title: 'CXO', serviceType: 'PM', baseCost: 100, burdenPercent: 35, mspPrice: 350, nonMspPrice: 400, afterHoursPercent: 50 },
       DIO: { title: 'Director of IT Operations', serviceType: 'AD', baseCost: 91.35, burdenPercent: 35, mspPrice: 240, nonMspPrice: 275, afterHoursPercent: 50 },
       SE: { title: 'Systems Engineer', serviceType: 'TI', baseCost: 33.65, burdenPercent: 35, mspPrice: 195, nonMspPrice: 225, afterHoursPercent: 50 },
     };
-
+    
     const getFullyBurdenedCost = (rate) => rate.baseCost * (1 + rate.burdenPercent / 100);
     const initialExpenseConstants = { mileageRate: 0.56, mealsPerDay: 46, lodgingPerNight: 160 };
     const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(val) || 0);
     const formatPercent = (val) => (parseFloat(val) || 0).toFixed(1) + '%';
-
+    
+    // Main App
     function App() {
       const [activeTab, setActiveTab] = useState('cover');
-
-      // Cover and scope state (same as your local file)
+      const [initializedFromPlan, setInitializedFromPlan] = useState(false);
+      
+      // Cover data
       const [coverData, setCoverData] = useState({
         projectName: '', customerId: '', description: '', engagementType: 'Fixed Fee',
         tAndMNotToExceed: 0, targetGM: 50, isMspClient: false, mspDiscount: 10,
         projectResources: ['', '', '', '', ''], upfrontPercent: 50, signoffPercent: 50, tAndMStatusThreshold: 75,
       });
-
+      
+      // Scope data
       const [scopeData, setScopeData] = useState({
         scopeDescription: '', deliverables: ['', '', '', ''], timeline: '',
         maintenanceWindows: 0, maintenanceWindowTime: '', estimatedOutageHours: 0, variablesUnknowns: '',
       });
-
+      
+      // Client SOW display toggles
       const [clientToggles, setClientToggles] = useState({
         showPhases: true, showPhaseHours: true, showPhasePrices: true,
         showTimeline: true, showMaintenanceWindows: true, showOutageHours: true, showPaymentTerms: true,
       });
-
+      
+      // Rates & Constants
       const [rates, setRates] = useState(initialRates);
       const [expenseConstants, setExpenseConstants] = useState(initialExpenseConstants);
-
+      
+      // Service items
       const [serviceItems, setServiceItems] = useState([
-        { id: 1, phase: 'Assessment', editable: true, subItems: [] },
-        { id: 2, phase: 'Digital Transformation Roadmap', editable: true, subItems: [] },
+        { id: 1, phase: 'Assessment', editable: true, subItems: [
+          { id: 11, description: 'Network Equipment and site-site VPN configuration review', resourceClass: 'DIO', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 12, description: 'Perform penetration testing to identify vulnerabilities', resourceClass: 'SE', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 13, description: 'Authentication mechanism review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 14, description: 'Risk assessment with password complexity and MFA review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 15, description: 'Backup solution review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 16, description: 'BCDR plan review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 17, description: 'Document storage review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 18, description: 'Email Collaboration review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 19, description: 'Laptop/Desktop Assessment', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 20, description: 'Network Equipment lifecycle management review', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        ]},
+        { id: 2, phase: 'Digital Transformation Roadmap', editable: true, subItems: [
+          { id: 31, description: 'SharePoint/OneDrive Migration Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 32, description: 'Office 365 Migration feasibility plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 33, description: 'Endpoint Management and security tools Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 34, description: 'IT Risk Assessment Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 35, description: 'Network Security and Penetration Testing Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 36, description: 'BCDR Documentation', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 37, description: 'Network Equipment lifecycle management/refresh', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        ]},
         { id: 3, phase: 'Implementation Phase', editable: true, subItems: [] },
-        { id: 4, phase: 'PM Phase', editable: true, subItems: [] },
+        { id: 4, phase: 'PM Phase', editable: true, subItems: [
+          { id: 71, description: 'Project Review', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+          { id: 72, description: 'Project Close', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        ]},
       ]);
-
-      const [products, setProducts] = useState([]);
+      
+      // Products
+      const [products, setProducts] = useState([
+        { id: 1, name: '', category: 'Firewall', cost: 0, qty: 1, markup: 20, vendorInstall: false, saxInstall: true, installHours: 0, installResource: 'SE' },
+      ]);
+      
+      // Change Orders
       const [changeOrders, setChangeOrders] = useState([]);
+      
+      // Expenses
       const [billableExpenses, setBillableExpenses] = useState({
         CXO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
         DIO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
         SE: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
       });
+      
       const [nonBillableExpenses, setNonBillableExpenses] = useState({
         CXO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
         DIO: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
         SE: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
       });
+      
       const [billableTools, setBillableTools] = useState([{ id: 1, description: '', cost: 0, qty: 0, notes: '' }]);
-
+      
+      // SAX signature
       const [saxSignatureData, setSaxSignatureData] = useState(null);
       const [saxSignerName, setSaxSignerName] = useState('');
       const [saxSignerTitle, setSaxSignerTitle] = useState('');
-
-      const [initializedFromPlan, setInitializedFromPlan] = useState(false);
-
-      // NEW: auto-load from MA onboarding execution plan when sessionId is provided
+      
+      // Get effective rate
+      const getEffectiveRate = useCallback((resourceClass) => {
+        const rate = rates[resourceClass];
+        if (!rate) return 0;
+        let baseRate = coverData.isMspClient ? rate.mspPrice : rate.nonMspPrice;
+        if (coverData.isMspClient && coverData.mspDiscount > 0) baseRate = baseRate * (1 - coverData.mspDiscount / 100);
+        return baseRate;
+      }, [rates, coverData.isMspClient, coverData.mspDiscount]);
+      
+      // Phase totals
+      const phaseTotals = useMemo(() => {
+        return serviceItems.map(phase => {
+          let hours = 0, cost = 0, maintenanceCount = 0, outageHours = 0;
+          phase.subItems.forEach(item => {
+            const h = parseFloat(item.hours) || 0;
+            hours += h;
+            cost += h * getEffectiveRate(item.resourceClass);
+            if (item.maintenanceRequired) maintenanceCount++;
+            outageHours += parseFloat(item.outageHours) || 0;
+          });
+          return { id: phase.id, name: phase.phase, hours, cost, maintenanceCount, outageHours };
+        });
+      }, [serviceItems, getEffectiveRate]);
+      
+      const totalHours = useMemo(() => phaseTotals.reduce((sum, p) => sum + p.hours, 0), [phaseTotals]);
+      const laborRevenue = useMemo(() => phaseTotals.reduce((sum, p) => sum + p.cost, 0), [phaseTotals]);
+      
+      const laborCost = useMemo(() => {
+        let total = 0;
+        serviceItems.forEach(phase => {
+          phase.subItems.forEach(item => {
+            const hours = parseFloat(item.hours) || 0;
+            const rate = rates[item.resourceClass];
+            if (rate) total += hours * getFullyBurdenedCost(rate);
+          });
+        });
+        return total;
+      }, [serviceItems, rates]);
+      
+      const maintenanceWindowsNeeded = useMemo(() => phaseTotals.reduce((sum, p) => sum + p.maintenanceCount, 0), [phaseTotals]);
+      const totalOutageHours = useMemo(() => phaseTotals.reduce((sum, p) => sum + p.outageHours, 0), [phaseTotals]);
+      
+      useEffect(() => {
+        setScopeData(prev => ({ ...prev, maintenanceWindows: maintenanceWindowsNeeded, estimatedOutageHours: totalOutageHours }));
+      }, [maintenanceWindowsNeeded, totalOutageHours]);
+      
+      const productsTotal = useMemo(() => products.reduce((sum, p) => sum + (p.cost * (1 + p.markup / 100) * p.qty), 0), [products]);
+      const productsCost = useMemo(() => products.reduce((sum, p) => sum + (p.cost * p.qty), 0), [products]);
+      const productsInstallLabor = useMemo(() => products.reduce((sum, p) => p.saxInstall && p.installHours > 0 ? sum + (p.installHours * getEffectiveRate(p.installResource)) : sum, 0), [products, getEffectiveRate]);
+      
+      const calcExpenseTotal = (exp, resourceClass) => {
+        const rate = getEffectiveRate(resourceClass);
+        return (exp.trips * exp.mileage * expenseConstants.mileageRate) + (exp.travelHours * rate) + 
+               (exp.expenseDays * expenseConstants.mealsPerDay) + (exp.expenseDays * expenseConstants.lodgingPerNight) + 
+               exp.airfare + exp.misc + exp.rentalCar;
+      };
+      
+      const totalBillableExpenses = useMemo(() => {
+        let total = Object.keys(billableExpenses).reduce((sum, key) => sum + calcExpenseTotal(billableExpenses[key], key), 0);
+        total += billableTools.reduce((sum, t) => sum + (t.cost * t.qty), 0);
+        return total;
+      }, [billableExpenses, billableTools]);
+      
+      const totalNonBillableExpenses = useMemo(() => Object.keys(nonBillableExpenses).reduce((sum, key) => sum + calcExpenseTotal(nonBillableExpenses[key], key), 0), [nonBillableExpenses]);
+      
+      const grandTotalRevenue = laborRevenue + productsTotal + productsInstallLabor + totalBillableExpenses;
+      const grandTotalCost = laborCost + productsCost + totalNonBillableExpenses;
+      const grossProfit = grandTotalRevenue - grandTotalCost;
+      const grossMargin = grandTotalRevenue > 0 ? (grossProfit / grandTotalRevenue) * 100 : 0;
+      const upfrontAmount = grandTotalRevenue * (coverData.upfrontPercent / 100);
+      const signoffAmount = grandTotalRevenue * (coverData.signoffPercent / 100);
+      const avgHourlyCost = totalHours > 0 ? laborCost / totalHours : 0;
+      const avgHourlyRate = totalHours > 0 ? laborRevenue / totalHours : 0;
+      const estimatedWeeks = useMemo(() => Math.ceil(totalHours / 40), [totalHours]);
+      const changeOrdersTotal = useMemo(() => changeOrders.reduce((sum, co) => sum + (co.approved ? co.amount : 0), 0), [changeOrders]);
+      
+      // Auto-load from MA Onboarding execution plan via sow-builder-data when sessionId is provided
       useEffect(() => {
         if (initializedFromPlan) return;
         const params = new URLSearchParams(window.location.search);
@@ -111,7 +720,7 @@
               encodeURIComponent(sessionId)
             );
             if (!resp.ok) {
-              console.error('SOW builder data not available yet for session', sessionId);
+              console.error('SOW builder data not available yet for session', sessionId, resp.status);
               return;
             }
             const data = await resp.json();
@@ -139,24 +748,909 @@
 
         loadFromPlan();
       }, [initializedFromPlan]);
-
-      // NOTE: The rest of your original App implementation (tabs, components, calculations, etc.)
-      // should remain exactly as in your local sax-ma-sow-builder.html, using the same state
-      // variables defined above.
-
+      
+      // Service item handlers
+      const updateServiceItem = (phaseId, itemId, field, value) => {
+        setServiceItems(prev => prev.map(phase => phase.id === phaseId ? { ...phase, subItems: phase.subItems.map(item => item.id === itemId ? { ...item, [field]: value } : item) } : phase));
+      };
+      const addServiceItem = (phaseId) => {
+        setServiceItems(prev => prev.map(phase => phase.id === phaseId ? { ...phase, subItems: [...phase.subItems, { id: Date.now(), description: 'New Task', resourceClass: 'SE', hours: 0, afterHours: false, maintenanceRequired: false, outageHours: 0 }] } : phase));
+      };
+      const deleteServiceItem = (phaseId, itemId) => {
+        setServiceItems(prev => prev.map(phase => phase.id === phaseId ? { ...phase, subItems: phase.subItems.filter(item => item.id !== itemId) } : phase));
+      };
+      const updatePhaseName = (phaseId, newName) => {
+        setServiceItems(prev => prev.map(phase => phase.id === phaseId ? { ...phase, phase: newName } : phase));
+      };
+      const addPhase = () => {
+        setServiceItems(prev => [...prev, { id: Date.now(), phase: 'New Phase', editable: true, subItems: [] }]);
+      };
+      const deletePhase = (phaseId) => {
+        setServiceItems(prev => prev.filter(phase => phase.id !== phaseId));
+      };
+      
+      // Product handlers
+      const addProduct = () => setProducts(prev => [...prev, { id: Date.now(), name: '', category: 'Other', cost: 0, qty: 1, markup: 20, vendorInstall: false, saxInstall: true, installHours: 0, installResource: 'SE' }]);
+      const updateProduct = (id, field, value) => setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+      const deleteProduct = (id) => setProducts(prev => prev.filter(p => p.id !== id));
+      
+      // Change order handlers
+      const addChangeOrder = () => setChangeOrders(prev => [...prev, { id: Date.now(), title: '', description: '', reason: '', items: [], amount: 0, approved: false, approvedDate: '', approvedBy: '' }]);
+      const updateChangeOrder = (id, field, value) => setChangeOrders(prev => prev.map(co => co.id === id ? { ...co, [field]: value } : co));
+      const deleteChangeOrder = (id) => setChangeOrders(prev => prev.filter(co => co.id !== id));
+      
+      // Excel Export Function
+      const exportToExcel = () => {
+        const wb = XLSX.utils.book_new();
+        
+        // Cover Sheet
+        const coverSheet = [
+          ['SAX M&A SOW/Proposal - Cover Sheet'],
+          [],
+          ['Project Name', coverData.projectName],
+          ['Customer ID', coverData.customerId],
+          ['Description', coverData.description],
+          ['Engagement Type', coverData.engagementType],
+          ['T&M Not to Exceed', coverData.tAndMNotToExceed],
+          ['Target GM %', coverData.targetGM],
+          ['MSP Client', coverData.isMspClient ? 'Yes' : 'No'],
+          ['MSP Discount %', coverData.mspDiscount],
+          ['Upfront %', coverData.upfrontPercent],
+          ['Signoff %', coverData.signoffPercent],
+          [],
+          ['Project Resources'],
+          ...coverData.projectResources.filter(r => r).map((r, i) => [`Resource ${i+1}`, r]),
+          [],
+          ['Financial Summary'],
+          ['Labor Revenue', laborRevenue],
+          ['Products Revenue', productsTotal],
+          ['Billable Expenses', totalBillableExpenses],
+          ['Labor Cost', laborCost],
+          ['Non-Billable Expenses', totalNonBillableExpenses],
+          ['Gross Profit', grossProfit],
+          ['Gross Margin %', grossMargin],
+          ['Total Sell Price', grandTotalRevenue],
+        ];
+        const ws1 = XLSX.utils.aoa_to_sheet(coverSheet);
+        XLSX.utils.book_append_sheet(wb, ws1, 'Cover');
+        
+        // Services Estimator Sheet
+        const servicesHeader = ['Phase', 'Activity Description', 'Resource Class', 'Hours', 'Rate', 'Extended', 'After Hours', 'Maint Required', 'Outage Hours'];
+        const servicesData = [servicesHeader];
+        serviceItems.forEach(phase => {
+          phase.subItems.forEach(item => {
+            const rate = getEffectiveRate(item.resourceClass);
+            servicesData.push([
+              phase.phase,
+              item.description,
+              item.resourceClass,
+              item.hours,
+              rate,
+              item.hours * rate,
+              item.afterHours ? 'Yes' : 'No',
+              item.maintenanceRequired ? 'Yes' : 'No',
+              item.outageHours || 0
+            ]);
+          });
+        });
+        servicesData.push([]);
+        servicesData.push(['TOTAL', '', '', totalHours, '', laborRevenue, '', '', totalOutageHours]);
+        const ws2 = XLSX.utils.aoa_to_sheet(servicesData);
+        XLSX.utils.book_append_sheet(wb, ws2, 'Services Estimator');
+        
+        // Expense Estimator Sheet
+        const expenseHeader = ['Resource', 'Type', 'Trips', 'RT Miles', 'Mileage Exp', 'Travel Hours', 'Travel Exp', 'Expense Days', 'Meals', 'Lodging', 'Airfare', 'Misc', 'Rental Car', 'Total'];
+        const expenseData = [expenseHeader];
+        ['CXO', 'DIO', 'SE'].forEach(key => {
+          const exp = billableExpenses[key];
+          const rate = getEffectiveRate(key);
+          const mileageExp = exp.trips * exp.mileage * expenseConstants.mileageRate;
+          const travelExp = exp.travelHours * rate;
+          const meals = exp.expenseDays * expenseConstants.mealsPerDay;
+          const lodging = exp.expenseDays * expenseConstants.lodgingPerNight;
+          const total = calcExpenseTotal(exp, key);
+          expenseData.push([rates[key]?.title || key, 'Billable', exp.trips, exp.mileage, mileageExp, exp.travelHours, travelExp, exp.expenseDays, meals, lodging, exp.airfare, exp.misc, exp.rentalCar, total]);
+        });
+        ['CXO', 'DIO', 'SE'].forEach(key => {
+          const exp = nonBillableExpenses[key];
+          const rate = getEffectiveRate(key);
+          const mileageExp = exp.trips * exp.mileage * expenseConstants.mileageRate;
+          const travelExp = exp.travelHours * rate;
+          const meals = exp.expenseDays * expenseConstants.mealsPerDay;
+          const lodging = exp.expenseDays * expenseConstants.lodgingPerNight;
+          const total = calcExpenseTotal(exp, key);
+          expenseData.push([rates[key]?.title || key, 'Non-Billable', exp.trips, exp.mileage, mileageExp, exp.travelHours, travelExp, exp.expenseDays, meals, lodging, exp.airfare, exp.misc, exp.rentalCar, total]);
+        });
+        expenseData.push([]);
+        expenseData.push(['Billable Tools']);
+        expenseData.push(['Description', 'Cost', 'Qty', 'Total', 'Notes']);
+        billableTools.forEach(tool => {
+          expenseData.push([tool.description, tool.cost, tool.qty, tool.cost * tool.qty, tool.notes]);
+        });
+        const ws3 = XLSX.utils.aoa_to_sheet(expenseData);
+        XLSX.utils.book_append_sheet(wb, ws3, 'Expense Estimator');
+        
+        // Margin Estimator Sheet
+        const marginHeader = ['Resource', 'Service Type', 'Hours', 'Fully Burdened Cost', 'Bill Rate', 'Labor Revenue', 'Labor Cost', 'Profit', 'Margin %'];
+        const marginData = [marginHeader];
+        Object.keys(rates).forEach(key => {
+          let totalHrs = 0;
+          serviceItems.forEach(phase => { phase.subItems.forEach(item => { if (item.resourceClass === key) totalHrs += parseFloat(item.hours) || 0; }); });
+          const effectiveRate = getEffectiveRate(key);
+          const fullyBurdenedCost = getFullyBurdenedCost(rates[key]);
+          const laborRev = totalHrs * effectiveRate;
+          const laborCostItem = totalHrs * fullyBurdenedCost;
+          const profit = laborRev - laborCostItem;
+          const margin = laborRev > 0 ? (profit / laborRev) * 100 : 0;
+          marginData.push([rates[key].title, rates[key].serviceType, totalHrs, fullyBurdenedCost, effectiveRate, laborRev, laborCostItem, profit, margin]);
+        });
+        marginData.push([]);
+        marginData.push(['Project Summary']);
+        marginData.push(['Total Labor Revenue', laborRevenue]);
+        marginData.push(['Total Labor Cost', laborCost]);
+        marginData.push(['Products Revenue', productsTotal]);
+        marginData.push(['Products Cost', productsCost]);
+        marginData.push(['Billable Expenses', totalBillableExpenses]);
+        marginData.push(['Non-Billable Expenses', totalNonBillableExpenses]);
+        marginData.push(['Gross Profit', grossProfit]);
+        marginData.push(['Gross Margin %', grossMargin]);
+        const ws4 = XLSX.utils.aoa_to_sheet(marginData);
+        XLSX.utils.book_append_sheet(wb, ws4, 'Margin Estimator');
+        
+        // Rate Structure Sheet
+        const rateHeader = ['Class', 'Title', 'Service Type', 'Base Cost', 'Burden %', 'Fully Burdened', 'MSP Price', 'Non-MSP Price', 'After Hours %'];
+        const rateData = [rateHeader];
+        Object.keys(rates).forEach(key => {
+          const r = rates[key];
+          rateData.push([key, r.title, r.serviceType, r.baseCost, r.burdenPercent, getFullyBurdenedCost(r), r.mspPrice, r.nonMspPrice, r.afterHoursPercent]);
+        });
+        rateData.push([]);
+        rateData.push(['Expense Constants']);
+        rateData.push(['Mileage Rate', expenseConstants.mileageRate]);
+        rateData.push(['Meals Per Day', expenseConstants.mealsPerDay]);
+        rateData.push(['Lodging Per Night', expenseConstants.lodgingPerNight]);
+        const ws5 = XLSX.utils.aoa_to_sheet(rateData);
+        XLSX.utils.book_append_sheet(wb, ws5, 'Rate Structure');
+        
+        // Products Sheet
+        const productsHeader = ['Product Name', 'Category', 'Cost', 'Qty', 'Markup %', 'Sell Price', 'Vendor Install', 'SAX Install', 'Install Hours', 'Install Resource', 'Install Cost'];
+        const productsData = [productsHeader];
+        products.forEach(p => {
+          const sellPrice = p.cost * (1 + p.markup / 100) * p.qty;
+          const installCost = p.saxInstall ? (p.installHours * getEffectiveRate(p.installResource)) : 0;
+          productsData.push([p.name, p.category, p.cost, p.qty, p.markup, sellPrice, p.vendorInstall ? 'Yes' : 'No', p.saxInstall ? 'Yes' : 'No', p.installHours, p.installResource, installCost]);
+        });
+        productsData.push([]);
+        productsData.push(['TOTALS', '', productsCost, '', '', productsTotal, '', '', '', '', productsInstallLabor]);
+        const ws6 = XLSX.utils.aoa_to_sheet(productsData);
+        XLSX.utils.book_append_sheet(wb, ws6, 'Products');
+        
+        // Change Orders Sheet (if any)
+        if (changeOrders.length > 0) {
+          const coData = [['Change Orders']];
+          changeOrders.forEach(co => {
+            coData.push([]);
+            coData.push(['Title', co.title]);
+            coData.push(['Reason', co.reason]);
+            coData.push(['Description', co.description]);
+            coData.push(['Amount', co.amount]);
+            coData.push(['Approved', co.approved ? 'Yes' : 'No']);
+            coData.push(['Approved By', co.approvedBy]);
+            coData.push(['Approved Date', co.approvedDate]);
+            coData.push(['Line Items:']);
+            coData.push(['Description', 'Resource', 'Hours', 'Rate', 'Amount']);
+            (co.items || []).forEach(item => {
+              coData.push([item.description, item.resourceClass, item.hours, getEffectiveRate(item.resourceClass), item.hours * getEffectiveRate(item.resourceClass)]);
+            });
+          });
+          const ws7 = XLSX.utils.aoa_to_sheet(coData);
+          XLSX.utils.book_append_sheet(wb, ws7, 'Change Orders');
+        }
+        
+        // Generate filename and save
+        const fileName = `SAX_MA_SOW_${coverData.projectName || 'Project'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+      };
+      
+      // Tabs
+      const tabs = [
+        { id: 'cover', label: 'Cover' },
+        { id: 'scope', label: 'Scope' },
+        { id: 'services', label: 'Services' },
+        { id: 'products', label: 'Products' },
+        { id: 'expenses', label: 'Expenses' },
+        { id: 'margin', label: 'Margin' },
+        { id: 'rates', label: 'Rates' },
+        { id: 'config', label: '⚙️ Config' },
+        { id: 'preview', label: 'Preview' },
+        { id: 'client', label: 'Client SOW' },
+        { id: 'changeorder', label: '📝 CO' },
+      ];
+      
       return (
         <div className="main-wrapper">
           <div className="app-title">
             <h1>🤖 SAX M&A SOW/Proposal Builder</h1>
             <p>Professional Services Estimation & Quoting Platform</p>
           </div>
-          {/* ... keep the rest of your existing JSX layout here ... */}
+          
+          <div className="export-bar">
+            <span>📤 Export:</span>
+            <button className="btn btn-primary" onClick={exportToExcel}>📊 Export to Excel (.xlsx)</button>
+            <button className="btn btn-secondary" onClick={() => window.print()}>🖨️ Print</button>
+          </div>
+          
+          <div className="nav-tabs">
+            {tabs.map(tab => (
+              <button key={tab.id} className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+                {tab.label}
+                {tab.id === 'changeorder' && changeOrders.length > 0 && <span className="change-order-badge">{changeOrders.length}</span>}
+              </button>
+            ))}
+          </div>
+          
+          {/* Cover Tab */}
+          <div className={`container ${activeTab === 'cover' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">📋</span><h1>Cover Sheet</h1><p>Project Information & Financial Summary</p></div>
+            <div className="content-area">
+              <CoverTab data={coverData} setData={setCoverData} grossProfit={grossProfit} grossMargin={grossMargin} laborRevenue={laborRevenue} laborCost={laborCost} productsTotal={productsTotal} totalBillableExpenses={totalBillableExpenses} totalNonBillableExpenses={totalNonBillableExpenses} grandTotalRevenue={grandTotalRevenue} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} />
+            </div>
+          </div>
+          
+          {/* Scope Tab */}
+          <div className={`container ${activeTab === 'scope' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">📝</span><h1>Summary Scope</h1><p>Project Overview, Deliverables & Timeline</p></div>
+            <div className="content-area">
+              <ScopeTab data={scopeData} setData={setScopeData} totalHours={totalHours} estimatedWeeks={estimatedWeeks} maintenanceWindowsNeeded={maintenanceWindowsNeeded} totalOutageHours={totalOutageHours} />
+            </div>
+          </div>
+          
+          {/* Services Tab */}
+          <div className={`container ${activeTab === 'services' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">⚡</span><h1>Services Estimator</h1><p>Phases, Tasks & Labor Hours</p></div>
+            <div className="content-area">
+              <ServicesTab serviceItems={serviceItems} rates={rates} getEffectiveRate={getEffectiveRate} updateServiceItem={updateServiceItem} addServiceItem={addServiceItem} deleteServiceItem={deleteServiceItem} updatePhaseName={updatePhaseName} addPhase={addPhase} deletePhase={deletePhase} totalHours={totalHours} laborRevenue={laborRevenue} avgHourlyCost={avgHourlyCost} avgHourlyRate={avgHourlyRate} phaseTotals={phaseTotals} />
+            </div>
+          </div>
+          
+          {/* Products Tab */}
+          <div className={`container ${activeTab === 'products' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">🖥️</span><h1>Products & Equipment</h1><p>Hardware with Markup & Installation</p></div>
+            <div className="content-area">
+              <ProductsTab products={products} rates={rates} addProduct={addProduct} updateProduct={updateProduct} deleteProduct={deleteProduct} productsTotal={productsTotal} productsCost={productsCost} productsInstallLabor={productsInstallLabor} getEffectiveRate={getEffectiveRate} />
+            </div>
+          </div>
+          
+          {/* Expenses Tab */}
+          <div className={`container ${activeTab === 'expenses' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">💰</span><h1>Expense Estimator</h1><p>Travel, Tools & Billable Expenses</p></div>
+            <div className="content-area">
+              <ExpensesTab billableExpenses={billableExpenses} setBillableExpenses={setBillableExpenses} nonBillableExpenses={nonBillableExpenses} setNonBillableExpenses={setNonBillableExpenses} billableTools={billableTools} setBillableTools={setBillableTools} rates={rates} expenseConstants={expenseConstants} calcExpenseTotal={calcExpenseTotal} getEffectiveRate={getEffectiveRate} />
+            </div>
+          </div>
+          
+          {/* Margin Tab */}
+          <div className={`container ${activeTab === 'margin' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">📊</span><h1>Margin Estimator</h1><p>Project Profitability Analysis</p></div>
+            <div className="content-area">
+              <MarginTab rates={rates} coverData={coverData} serviceItems={serviceItems} calcExpenseTotal={calcExpenseTotal} getEffectiveRate={getEffectiveRate} laborRevenue={laborRevenue} laborCost={laborCost} productsTotal={productsTotal} productsCost={productsCost} totalBillableExpenses={totalBillableExpenses} totalNonBillableExpenses={totalNonBillableExpenses} grossProfit={grossProfit} grossMargin={grossMargin} />
+            </div>
+          </div>
+          
+          {/* Rates Tab */}
+          <div className={`container ${activeTab === 'rates' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">💵</span><h1>Rate Structure</h1><p>Current Billing Rates (Edit in Config)</p></div>
+            <div className="content-area">
+              <RatesTab rates={rates} coverData={coverData} />
+            </div>
+          </div>
+          
+          {/* Config Tab */}
+          <div className={`container ${activeTab === 'config' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">⚙️</span><h1>Configurator</h1><p>Rates, Costs & System Settings</p></div>
+            <div className="content-area">
+              <ConfiguratorTab rates={rates} setRates={setRates} expenseConstants={expenseConstants} setExpenseConstants={setExpenseConstants} coverData={coverData} setCoverData={setCoverData} saxSignerName={saxSignerName} setSaxSignerName={setSaxSignerName} saxSignerTitle={saxSignerTitle} setSaxSignerTitle={setSaxSignerTitle} saxSignatureData={saxSignatureData} setSaxSignatureData={setSaxSignatureData} />
+            </div>
+          </div>
+          
+          {/* Preview Tab */}
+          <div className={`container ${activeTab === 'preview' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">👁️</span><h1>Preview SOW</h1><p>Internal Preview</p></div>
+            <div className="content-area">
+              <PreviewSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} grossProfit={grossProfit} grossMargin={grossMargin} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} />
+            </div>
+          </div>
+          
+          {/* Client SOW Tab */}
+          <div className={`container ${activeTab === 'client' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">✍️</span><h1>Client SOW</h1><p>Client-Facing Statement of Work</p></div>
+            <div className="content-area">
+              <ClientSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} estimatedWeeks={estimatedWeeks} clientToggles={clientToggles} setClientToggles={setClientToggles} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} maintenanceWindowsNeeded={maintenanceWindowsNeeded} totalOutageHours={totalOutageHours} saxSignatureData={saxSignatureData} saxSignerName={saxSignerName} saxSignerTitle={saxSignerTitle} />
+            </div>
+          </div>
+          
+          {/* Change Orders Tab */}
+          <div className={`container ${activeTab === 'changeorder' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">📝</span><h1>Change Orders</h1><p>Scope Changes & Additional Work</p></div>
+            <div className="content-area">
+              <ChangeOrderTab changeOrders={changeOrders} addChangeOrder={addChangeOrder} updateChangeOrder={updateChangeOrder} deleteChangeOrder={deleteChangeOrder} rates={rates} getEffectiveRate={getEffectiveRate} changeOrdersTotal={changeOrdersTotal} />
+            </div>
+          </div>
         </div>
       );
     }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    
+    // Cover Tab
+    function CoverTab({ data, setData, grossProfit, grossMargin, laborRevenue, laborCost, productsTotal, totalBillableExpenses, totalNonBillableExpenses, grandTotalRevenue, upfrontAmount, signoffAmount }) {
+      return (
+        <div>
+          <h2 className="section-title">Project Information</h2>
+          <div className="form-grid">
+            <div className="form-group"><label>Project Name</label><input type="text" value={data.projectName} onChange={(e) => setData(prev => ({ ...prev, projectName: e.target.value }))} placeholder="Enter project name..." /></div>
+            <div className="form-group"><label>Customer Name/ID</label><input type="text" value={data.customerId} onChange={(e) => setData(prev => ({ ...prev, customerId: e.target.value }))} placeholder="Enter customer..." /></div>
+            <div className="form-group"><label>Engagement Type</label><select value={data.engagementType} onChange={(e) => setData(prev => ({ ...prev, engagementType: e.target.value }))}><option value="Fixed Fee">Fixed Fee</option><option value="T&M">Time & Materials (T&M)</option></select></div>
+            {data.engagementType === 'T&M' && <div className="form-group"><label>T&M Not to Exceed ($)</label><input type="number" min="0" value={data.tAndMNotToExceed} onChange={(e) => setData(prev => ({ ...prev, tAndMNotToExceed: parseFloat(e.target.value) || 0 }))} /></div>}
+          </div>
+          <div className="form-group" style={{ marginBottom: 20 }}><label>Description</label><textarea rows={3} value={data.description} onChange={(e) => setData(prev => ({ ...prev, description: e.target.value }))} placeholder="Describe the engagement..." /></div>
+          <div className="form-grid">
+            <div className="form-group"><label>Target GM (%)</label><input type="number" min="0" max="100" value={data.targetGM} onChange={(e) => setData(prev => ({ ...prev, targetGM: parseFloat(e.target.value) || 0 }))} style={{ width: 80 }} /></div>
+            <div className="form-group"><div className="checkbox-group"><input type="checkbox" checked={data.isMspClient} onChange={(e) => setData(prev => ({ ...prev, isMspClient: e.target.checked }))} /><label>Existing MSP Client</label></div></div>
+            <div className="form-group"><label>{data.isMspClient ? 'MSP Discount (%)' : 'Discount (%)'}</label><input type="number" min="0" max="50" value={data.mspDiscount} onChange={(e) => setData(prev => ({ ...prev, mspDiscount: parseFloat(e.target.value) || 0 }))} style={{ width: 80 }} /></div>
+          </div>
+          <div className="subsection-title">Payment Terms</div>
+          <div className="form-grid">
+            <div className="form-group"><label>Upfront Payment (%)</label><input type="number" min="0" max="100" value={data.upfrontPercent} onChange={(e) => setData(prev => ({ ...prev, upfrontPercent: parseFloat(e.target.value) || 0 }))} style={{ width: 80 }} /><small style={{ color: '#6c757d' }}>{formatCurrency(upfrontAmount)}</small></div>
+            <div className="form-group"><label>Sign-off Payment (%)</label><input type="number" min="0" max="100" value={data.signoffPercent} onChange={(e) => setData(prev => ({ ...prev, signoffPercent: parseFloat(e.target.value) || 0 }))} style={{ width: 80 }} /><small style={{ color: '#6c757d' }}>{formatCurrency(signoffAmount)}</small></div>
+          </div>
+          <div className="subsection-title">Project Resources</div>
+          <div className="form-grid">
+            {data.projectResources.map((member, idx) => <div className="form-group" key={idx}><label>Resource {idx + 1}</label><input type="text" value={member} onChange={(e) => { const t = [...data.projectResources]; t[idx] = e.target.value; setData(prev => ({ ...prev, projectResources: t })); }} placeholder="Name / Role" /></div>)}
+          </div>
+          <div className="subsection-title">Financial Summary</div>
+          <div className="summary-cards">
+            <div className="summary-card"><div className="summary-card-label">Labor Revenue</div><div className="summary-card-value">{formatCurrency(laborRevenue)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Products</div><div className="summary-card-value">{formatCurrency(productsTotal)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Expenses</div><div className="summary-card-value">{formatCurrency(totalBillableExpenses)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Total Sell</div><div className="summary-card-value">{formatCurrency(grandTotalRevenue)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Gross Profit</div><div className="summary-card-value">{formatCurrency(grossProfit)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Margin</div><div className="summary-card-value" style={{ color: grossMargin >= data.targetGM ? '#27ae60' : '#e74c3c' }}>{formatPercent(grossMargin)}</div></div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Scope Tab
+    function ScopeTab({ data, setData, totalHours, estimatedWeeks, maintenanceWindowsNeeded, totalOutageHours }) {
+      return (
+        <div>
+          <h2 className="section-title">Project Scope</h2>
+          <div className="form-group" style={{ marginBottom: 20 }}><label>Scope Description</label><textarea rows={5} value={data.scopeDescription} onChange={(e) => setData(prev => ({ ...prev, scopeDescription: e.target.value }))} placeholder="Describe the project scope..." /></div>
+          <div className="subsection-title">Deliverables</div>
+          <div className="form-grid">
+            {data.deliverables.map((item, idx) => <div className="form-group" key={idx}><label>Deliverable {idx + 1}</label><input type="text" value={item} onChange={(e) => { const d = [...data.deliverables]; d[idx] = e.target.value; setData(prev => ({ ...prev, deliverables: d })); }} placeholder="Enter deliverable..." /></div>)}
+          </div>
+          <button className="add-row-btn" onClick={() => setData(prev => ({ ...prev, deliverables: [...prev.deliverables, ''] }))}>+ Add Deliverable</button>
+          <div className="subsection-title">Timeline & Maintenance</div>
+          <div className="summary-cards">
+            <div className="summary-card"><div className="summary-card-label">Total Hours</div><div className="summary-card-value">{totalHours}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Est. Duration</div><div className="summary-card-value">{estimatedWeeks} wks</div></div>
+            <div className="summary-card"><div className="summary-card-label">Maint. Windows</div><div className="summary-card-value">{maintenanceWindowsNeeded}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Outage Hours</div><div className="summary-card-value">{totalOutageHours}</div></div>
+          </div>
+          <div className="form-grid" style={{ marginTop: 15 }}>
+            <div className="form-group"><label>Timeline Notes</label><textarea rows={2} value={data.timeline} onChange={(e) => setData(prev => ({ ...prev, timeline: e.target.value }))} placeholder="Timeline details..." /></div>
+            <div className="form-group"><label>Maintenance Schedule</label><input type="text" value={data.maintenanceWindowTime} onChange={(e) => setData(prev => ({ ...prev, maintenanceWindowTime: e.target.value }))} placeholder="e.g., Saturdays 10PM-2AM" /></div>
+          </div>
+          <div className="subsection-title">Variables & Unknowns</div>
+          <div className="form-group"><textarea rows={4} value={data.variablesUnknowns} onChange={(e) => setData(prev => ({ ...prev, variablesUnknowns: e.target.value }))} placeholder="• Assumptions&#10;• Dependencies&#10;• Unknowns..." /></div>
+        </div>
+      );
+    }
+    
+    // Services Tab
+    function ServicesTab({ serviceItems, rates, getEffectiveRate, updateServiceItem, addServiceItem, deleteServiceItem, updatePhaseName, addPhase, deletePhase, totalHours, laborRevenue, avgHourlyCost, avgHourlyRate, phaseTotals }) {
+      return (
+        <div>
+          <h2 className="section-title">Services Estimation</h2>
+          <div className="summary-cards" style={{ marginBottom: 15 }}>
+            <div className="summary-card"><div className="summary-card-label">Total Hours</div><div className="summary-card-value">{totalHours}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Avg Cost/Hr</div><div className="summary-card-value">{formatCurrency(avgHourlyCost)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Avg Rate/Hr</div><div className="summary-card-value">{formatCurrency(avgHourlyRate)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Labor Revenue</div><div className="summary-card-value">{formatCurrency(laborRevenue)}</div></div>
+          </div>
+          <table>
+            <thead><tr><th style={{ width: 25 }}></th><th>Description</th><th style={{ width: 70 }}>Resource</th><th style={{ width: 55 }}>Hours</th><th style={{ width: 70 }}>Rate</th><th style={{ width: 80 }}>Extended</th><th style={{ width: 35 }}>AH</th><th style={{ width: 35 }}>Mnt</th><th style={{ width: 50 }}>Outage</th></tr></thead>
+            <tbody>
+              {serviceItems.map(phase => {
+                const pt = phaseTotals.find(p => p.id === phase.id) || { hours: 0, cost: 0 };
+                return (
+                  <React.Fragment key={phase.id}>
+                    <tr className="phase-header"><td><button className="btn-danger" onClick={() => deletePhase(phase.id)}>✕</button></td><td colSpan={8}><input type="text" className="inline-edit" value={phase.phase} onChange={(e) => updatePhaseName(phase.id, e.target.value)} style={{ fontWeight: 'bold', background: 'transparent' }} /></td></tr>
+                    {phase.subItems.map(item => {
+                      const rate = getEffectiveRate(item.resourceClass);
+                      return (
+                        <tr key={item.id}>
+                          <td><button className="btn-danger" onClick={() => deleteServiceItem(phase.id, item.id)}>✕</button></td>
+                          <td><input type="text" className="inline-edit" value={item.description} onChange={(e) => updateServiceItem(phase.id, item.id, 'description', e.target.value)} /></td>
+                          <td><select value={item.resourceClass} onChange={(e) => updateServiceItem(phase.id, item.id, 'resourceClass', e.target.value)} style={{ width: '100%' }}><option value="">—</option>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
+                          <td className="number"><input type="number" min="0" step="0.5" value={item.hours} onChange={(e) => updateServiceItem(phase.id, item.id, 'hours', parseFloat(e.target.value) || 0)} style={{ width: 50 }} /></td>
+                          <td className="currency">{formatCurrency(rate)}</td>
+                          <td className="currency">{formatCurrency(item.hours * rate)}</td>
+                          <td className="number"><input type="checkbox" checked={item.afterHours || false} onChange={(e) => updateServiceItem(phase.id, item.id, 'afterHours', e.target.checked)} /></td>
+                          <td className="number"><input type="checkbox" checked={item.maintenanceRequired || false} onChange={(e) => updateServiceItem(phase.id, item.id, 'maintenanceRequired', e.target.checked)} /></td>
+                          <td><input type="number" min="0" step="0.5" value={item.outageHours || 0} onChange={(e) => updateServiceItem(phase.id, item.id, 'outageHours', parseFloat(e.target.value) || 0)} style={{ width: 45 }} disabled={!item.maintenanceRequired} /></td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="totals-row"><td></td><td colSpan={2} style={{ textAlign: 'right' }}>Phase Total:</td><td className="number">{pt.hours}</td><td></td><td className="currency">{formatCurrency(pt.cost)}</td><td colSpan={3}></td></tr>
+                    <tr><td colSpan={9}><button className="add-row-btn" onClick={() => addServiceItem(phase.id)}>+ Add Task</button></td></tr>
+                  </React.Fragment>
+                );
+              })}
+              <tr className="grand-totals-row"><td></td><td colSpan={2} style={{ textAlign: 'right' }}>GRAND TOTAL:</td><td className="number">{totalHours}</td><td></td><td className="currency">{formatCurrency(laborRevenue)}</td><td colSpan={3}></td></tr>
+            </tbody>
+          </table>
+          <button className="btn btn-primary" onClick={addPhase} style={{ marginTop: 10 }}>+ Add Phase</button>
+        </div>
+      );
+    }
+    
+    // Products Tab
+    function ProductsTab({ products, rates, addProduct, updateProduct, deleteProduct, productsTotal, productsCost, productsInstallLabor, getEffectiveRate }) {
+      const categories = ['Firewall', 'Switch', 'Access Point', 'Server', 'UPS', 'Other'];
+      return (
+        <div>
+          <h2 className="section-title">Products & Equipment</h2>
+          <div className="summary-cards" style={{ marginBottom: 15 }}>
+            <div className="summary-card"><div className="summary-card-label">Cost</div><div className="summary-card-value">{formatCurrency(productsCost)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Install Labor</div><div className="summary-card-value">{formatCurrency(productsInstallLabor)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Sell Price</div><div className="summary-card-value">{formatCurrency(productsTotal)}</div></div>
+          </div>
+          <table>
+            <thead><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Qty</th><th>Markup%</th><th>Sell</th><th>Vendor</th><th>SAX</th><th>Hrs</th><th>Res</th><th>Install$</th></tr></thead>
+            <tbody>
+              {products.map(p => {
+                const sell = p.cost * (1 + p.markup / 100) * p.qty;
+                const inst = p.saxInstall ? (p.installHours * getEffectiveRate(p.installResource)) : 0;
+                return (
+                  <tr key={p.id}>
+                    <td><button className="btn-danger" onClick={() => deleteProduct(p.id)}>✕</button></td>
+                    <td><input type="text" className="inline-edit" value={p.name} onChange={(e) => updateProduct(p.id, 'name', e.target.value)} placeholder="Product..." /></td>
+                    <td><select value={p.category} onChange={(e) => updateProduct(p.id, 'category', e.target.value)}>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                    <td><input type="number" min="0" step="0.01" value={p.cost} onChange={(e) => updateProduct(p.id, 'cost', parseFloat(e.target.value) || 0)} style={{ width: 70 }} /></td>
+                    <td><input type="number" min="1" value={p.qty} onChange={(e) => updateProduct(p.id, 'qty', parseInt(e.target.value) || 1)} style={{ width: 40 }} /></td>
+                    <td><input type="number" min="0" value={p.markup} onChange={(e) => updateProduct(p.id, 'markup', parseFloat(e.target.value) || 0)} style={{ width: 50 }} /></td>
+                    <td className="currency">{formatCurrency(sell)}</td>
+                    <td className="number"><input type="checkbox" checked={p.vendorInstall} onChange={(e) => { updateProduct(p.id, 'vendorInstall', e.target.checked); if (e.target.checked) updateProduct(p.id, 'saxInstall', false); }} /></td>
+                    <td className="number"><input type="checkbox" checked={p.saxInstall} onChange={(e) => { updateProduct(p.id, 'saxInstall', e.target.checked); if (e.target.checked) updateProduct(p.id, 'vendorInstall', false); }} /></td>
+                    <td><input type="number" min="0" step="0.5" value={p.installHours} onChange={(e) => updateProduct(p.id, 'installHours', parseFloat(e.target.value) || 0)} disabled={!p.saxInstall} style={{ width: 45 }} /></td>
+                    <td><select value={p.installResource} onChange={(e) => updateProduct(p.id, 'installResource', e.target.value)} disabled={!p.saxInstall}>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
+                    <td className="currency">{formatCurrency(inst)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <button className="add-row-btn" onClick={addProduct}>+ Add Product</button>
+        </div>
+      );
+    }
+    
+    // Expenses Tab
+    function ExpensesTab({ billableExpenses, setBillableExpenses, nonBillableExpenses, setNonBillableExpenses, billableTools, setBillableTools, rates, expenseConstants, calcExpenseTotal, getEffectiveRate }) {
+      const updateBE = (r, f, v) => setBillableExpenses(prev => ({ ...prev, [r]: { ...prev[r], [f]: parseFloat(v) || 0 } }));
+      const updateNBE = (r, f, v) => setNonBillableExpenses(prev => ({ ...prev, [r]: { ...prev[r], [f]: parseFloat(v) || 0 } }));
+      const ExpTable = ({ exp, update, title }) => (
+        <>
+          <div className="subsection-title">{title}</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr><th>Resource</th><th>Rate</th><th>Trips</th><th>Miles</th><th>Miles$</th><th>TrvlHrs</th><th>Trvl$</th><th>Days</th><th>Meals</th><th>Lodge</th><th>Air</th><th>Misc</th><th>Rent</th><th>Total</th></tr></thead>
+              <tbody>
+                {Object.keys(exp).map(k => {
+                  const e = exp[k]; const rate = getEffectiveRate(k);
+                  const mExp = e.trips * e.mileage * expenseConstants.mileageRate;
+                  const tExp = e.travelHours * rate;
+                  const meals = e.expenseDays * expenseConstants.mealsPerDay;
+                  const lodge = e.expenseDays * expenseConstants.lodgingPerNight;
+                  return (
+                    <tr key={k}>
+                      <td>{rates[k]?.title || k}</td>
+                      <td className="currency">{formatCurrency(rate)}</td>
+                      <td><input type="number" min="0" value={e.trips} onChange={(x) => update(k, 'trips', x.target.value)} style={{ width: 40 }} /></td>
+                      <td><input type="number" min="0" value={e.mileage} onChange={(x) => update(k, 'mileage', x.target.value)} style={{ width: 50 }} /></td>
+                      <td className="currency">{formatCurrency(mExp)}</td>
+                      <td><input type="number" min="0" value={e.travelHours} onChange={(x) => update(k, 'travelHours', x.target.value)} style={{ width: 40 }} /></td>
+                      <td className="currency">{formatCurrency(tExp)}</td>
+                      <td><input type="number" min="0" value={e.expenseDays} onChange={(x) => update(k, 'expenseDays', x.target.value)} style={{ width: 40 }} /></td>
+                      <td className="currency">{formatCurrency(meals)}</td>
+                      <td className="currency">{formatCurrency(lodge)}</td>
+                      <td><input type="number" min="0" value={e.airfare} onChange={(x) => update(k, 'airfare', x.target.value)} style={{ width: 60 }} /></td>
+                      <td><input type="number" min="0" value={e.misc} onChange={(x) => update(k, 'misc', x.target.value)} style={{ width: 50 }} /></td>
+                      <td><input type="number" min="0" value={e.rentalCar} onChange={(x) => update(k, 'rentalCar', x.target.value)} style={{ width: 50 }} /></td>
+                      <td className="currency" style={{ fontWeight: 'bold' }}>{formatCurrency(calcExpenseTotal(e, k))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      );
+      return (
+        <div>
+          <h2 className="section-title">Expense Estimator</h2>
+          <ExpTable exp={billableExpenses} update={updateBE} title="Billable Expenses" />
+          <ExpTable exp={nonBillableExpenses} update={updateNBE} title="Non-Billable Expenses" />
+          <div className="subsection-title">Billable Tools</div>
+          <table style={{ maxWidth: 600 }}>
+            <thead><tr><th>Description</th><th>Cost</th><th>Qty</th><th>Total</th><th>Notes</th></tr></thead>
+            <tbody>
+              {billableTools.map((t, i) => (
+                <tr key={t.id}>
+                  <td><input type="text" value={t.description} onChange={(e) => { const u = [...billableTools]; u[i] = { ...t, description: e.target.value }; setBillableTools(u); }} style={{ width: 150 }} /></td>
+                  <td><input type="number" min="0" value={t.cost} onChange={(e) => { const u = [...billableTools]; u[i] = { ...t, cost: parseFloat(e.target.value) || 0 }; setBillableTools(u); }} style={{ width: 70 }} /></td>
+                  <td><input type="number" min="0" value={t.qty} onChange={(e) => { const u = [...billableTools]; u[i] = { ...t, qty: parseInt(e.target.value) || 0 }; setBillableTools(u); }} style={{ width: 40 }} /></td>
+                  <td className="currency">{formatCurrency(t.cost * t.qty)}</td>
+                  <td><input type="text" value={t.notes} onChange={(e) => { const u = [...billableTools]; u[i] = { ...t, notes: e.target.value }; setBillableTools(u); }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="add-row-btn" onClick={() => setBillableTools(prev => [...prev, { id: Date.now(), description: '', cost: 0, qty: 0, notes: '' }])}>+ Add Tool</button>
+        </div>
+      );
+    }
+    
+    // Margin Tab
+    function MarginTab({ rates, coverData, serviceItems, calcExpenseTotal, getEffectiveRate, laborRevenue, laborCost, productsTotal, productsCost, totalBillableExpenses, totalNonBillableExpenses, grossProfit, grossMargin }) {
+      const data = Object.keys(rates).map(k => {
+        let hrs = 0;
+        serviceItems.forEach(p => { p.subItems.forEach(i => { if (i.resourceClass === k) hrs += parseFloat(i.hours) || 0; }); });
+        const rate = getEffectiveRate(k); const fc = getFullyBurdenedCost(rates[k]);
+        const rev = hrs * rate; const cost = hrs * fc; const profit = rev - cost;
+        const margin = rev > 0 ? (profit / rev) * 100 : 0;
+        return { k, ...rates[k], hrs, rate, fc, rev, cost, profit, margin };
+      });
+      return (
+        <div>
+          <h2 className="section-title">Margin Analysis</h2>
+          <div className="subsection-title">By Resource</div>
+          <table>
+            <thead><tr><th>Resource</th><th>Type</th><th>Hours</th><th>Burdened</th><th>Rate</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead>
+            <tbody>
+              {data.map(r => (
+                <tr key={r.k}>
+                  <td>{r.title}</td><td>{r.serviceType}</td><td className="number">{r.hrs}</td>
+                  <td className="currency">{formatCurrency(r.fc)}</td><td className="currency">{formatCurrency(r.rate)}</td>
+                  <td className="currency">{formatCurrency(r.rev)}</td><td className="currency">{formatCurrency(r.cost)}</td>
+                  <td className="currency" style={{ color: r.profit >= 0 ? '#27ae60' : '#e74c3c' }}>{formatCurrency(r.profit)}</td>
+                  <td className="number" style={{ color: r.margin >= coverData.targetGM ? '#27ae60' : '#e74c3c' }}>{formatPercent(r.margin)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="subsection-title">Summary</div>
+          <div className="summary-cards">
+            <div className="summary-card"><div className="summary-card-label">Labor Rev</div><div className="summary-card-value">{formatCurrency(laborRevenue)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Labor Cost</div><div className="summary-card-value">{formatCurrency(laborCost)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Products Rev</div><div className="summary-card-value">{formatCurrency(productsTotal)}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Products Cost</div><div className="summary-card-value">{formatCurrency(productsCost)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Gross Profit</div><div className="summary-card-value" style={{ color: grossProfit >= 0 ? '#27ae60' : '#e74c3c' }}>{formatCurrency(grossProfit)}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Margin</div><div className="summary-card-value" style={{ color: grossMargin >= coverData.targetGM ? '#27ae60' : '#e74c3c' }}>{formatPercent(grossMargin)}</div></div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Rates Tab
+    function RatesTab({ rates, coverData }) {
+      return (
+        <div>
+          <h2 className="section-title">Rate Structure</h2>
+          <p style={{ color: '#6c757d', marginBottom: 15 }}>Edit in Configurator tab</p>
+          <table>
+            <thead><tr><th>Class</th><th>Title</th><th>Type</th><th>Base Cost</th><th>Burden%</th><th>Burdened</th><th>MSP$</th><th>Non-MSP$</th><th>AH%</th></tr></thead>
+            <tbody>
+              {Object.keys(rates).map(k => {
+                const r = rates[k];
+                return <tr key={k}><td><strong>{k}</strong></td><td>{r.title}</td><td>{r.serviceType}</td><td className="currency">{formatCurrency(r.baseCost)}</td><td className="number">{r.burdenPercent}%</td><td className="currency">{formatCurrency(getFullyBurdenedCost(r))}</td><td className="currency">{formatCurrency(r.mspPrice)}</td><td className="currency">{formatCurrency(r.nonMspPrice)}</td><td className="number">{r.afterHoursPercent}%</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    
+    // Configurator Tab
+    function ConfiguratorTab({ rates, setRates, expenseConstants, setExpenseConstants, coverData, setCoverData, saxSignerName, setSaxSignerName, saxSignerTitle, setSaxSignerTitle, saxSignatureData, setSaxSignatureData }) {
+      const canvasRef = useRef(null);
+      const [drawing, setDrawing] = useState(false);
+      useEffect(() => { const c = canvasRef.current; if (c) { const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); } }, []);
+      const startDraw = (e) => { const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.clientX - r.left, e.clientY - r.top); setDrawing(true); };
+      const draw = (e) => { if (!drawing) return; const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.lineTo(e.clientX - r.left, e.clientY - r.top); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke(); };
+      const stopDraw = () => { setDrawing(false); setSaxSignatureData(canvasRef.current.toDataURL()); };
+      const clearSig = () => { const c = canvasRef.current; const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); setSaxSignatureData(null); };
+      const updateRate = (k, f, v) => setRates(prev => ({ ...prev, [k]: { ...prev[k], [f]: typeof v === 'string' ? v : (parseFloat(v) || 0) } }));
+      return (
+        <div>
+          <h2 className="section-title">Configuration</h2>
+          <div className="config-section">
+            <h3>Rate Structure</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead><tr><th>Class</th><th>Title</th><th>Type</th><th>Base$</th><th>Burden%</th><th>MSP$</th><th>Non-MSP$</th><th>AH%</th></tr></thead>
+                <tbody>
+                  {Object.keys(rates).map(k => (
+                    <tr key={k}>
+                      <td><strong>{k}</strong></td>
+                      <td><input type="text" value={rates[k].title} onChange={(e) => updateRate(k, 'title', e.target.value)} style={{ width: 150 }} /></td>
+                      <td><select value={rates[k].serviceType} onChange={(e) => updateRate(k, 'serviceType', e.target.value)}>{SERVICE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
+                      <td><input type="number" min="0" step="0.01" value={rates[k].baseCost} onChange={(e) => updateRate(k, 'baseCost', e.target.value)} style={{ width: 70 }} /></td>
+                      <td><input type="number" min="0" value={rates[k].burdenPercent} onChange={(e) => updateRate(k, 'burdenPercent', e.target.value)} style={{ width: 50 }} /></td>
+                      <td><input type="number" min="0" value={rates[k].mspPrice} onChange={(e) => updateRate(k, 'mspPrice', e.target.value)} style={{ width: 70 }} /></td>
+                      <td><input type="number" min="0" value={rates[k].nonMspPrice} onChange={(e) => updateRate(k, 'nonMspPrice', e.target.value)} style={{ width: 70 }} /></td>
+                      <td><input type="number" min="0" value={rates[k].afterHoursPercent} onChange={(e) => updateRate(k, 'afterHoursPercent', e.target.value)} style={{ width: 50 }} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="config-section">
+            <h3>T&M Status Update</h3>
+            <p style={{ color: '#6c757d', marginBottom: 10, fontSize: '0.9em' }}>When reaching this % of budget, SAX will provide status updates.</p>
+            <div className="form-group" style={{ maxWidth: 200 }}>
+              <label>Threshold (%)</label>
+              <input type="number" min="0" max="100" value={coverData.tAndMStatusThreshold} onChange={(e) => setCoverData(prev => ({ ...prev, tAndMStatusThreshold: parseFloat(e.target.value) || 0 }))} />
+            </div>
+          </div>
+          <div className="config-section">
+            <h3>Expense Constants</h3>
+            <div className="form-grid">
+              <div className="form-group"><label>Mileage ($/mi)</label><input type="number" min="0" step="0.01" value={expenseConstants.mileageRate} onChange={(e) => setExpenseConstants(prev => ({ ...prev, mileageRate: parseFloat(e.target.value) || 0 }))} /></div>
+              <div className="form-group"><label>Meals ($/day)</label><input type="number" min="0" value={expenseConstants.mealsPerDay} onChange={(e) => setExpenseConstants(prev => ({ ...prev, mealsPerDay: parseFloat(e.target.value) || 0 }))} /></div>
+              <div className="form-group"><label>Lodging ($/night)</label><input type="number" min="0" value={expenseConstants.lodgingPerNight} onChange={(e) => setExpenseConstants(prev => ({ ...prev, lodgingPerNight: parseFloat(e.target.value) || 0 }))} /></div>
+            </div>
+          </div>
+          <div className="config-section">
+            <h3>SAX Signature</h3>
+            <div className="form-grid">
+              <div className="form-group"><label>Signer Name</label><input type="text" value={saxSignerName} onChange={(e) => setSaxSignerName(e.target.value)} placeholder="Name..." /></div>
+              <div className="form-group"><label>Signer Title</label><input type="text" value={saxSignerTitle} onChange={(e) => setSaxSignerTitle(e.target.value)} placeholder="Title..." /></div>
+            </div>
+            <div className="form-group"><label>Signature</label><canvas ref={canvasRef} width={350} height={70} className="signature-box" onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw} /><button className="btn btn-secondary" onClick={clearSig} style={{ marginTop: 8 }}>Clear</button></div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Preview SOW Tab
+    function PreviewSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, grossProfit, grossMargin, upfrontAmount, signoffAmount }) {
+      return (
+        <div>
+          <div className="warning-banner">INTERNAL PREVIEW ONLY</div>
+          <div className="preview-document">
+            <div className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'} | <strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()} | <strong>Type:</strong> {coverData.engagementType}</p></div>
+            <h3>Phase Summary</h3>
+            <table className="preview-table">
+              <thead><tr><th>Phase</th><th>Hours</th><th>Amount</th></tr></thead>
+              <tbody>
+                {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td><td>{p.hours}</td><td>{formatCurrency(p.cost)}</td></tr>)}
+                <tr style={{ background: '#FFD700', fontWeight: 'bold' }}><td>TOTAL</td><td>{totalHours}</td><td>{formatCurrency(laborRevenue)}</td></tr>
+              </tbody>
+            </table>
+            <h3>Investment</h3>
+            <table className="preview-table">
+              <tbody>
+                <tr><td>Labor</td><td style={{ textAlign: 'right' }}>{formatCurrency(laborRevenue)}</td></tr>
+                <tr><td>Products</td><td style={{ textAlign: 'right' }}>{formatCurrency(productsTotal + productsInstallLabor)}</td></tr>
+                <tr><td>Expenses</td><td style={{ textAlign: 'right' }}>{formatCurrency(totalBillableExpenses)}</td></tr>
+                <tr style={{ background: '#FFD700', fontWeight: 'bold' }}><td>TOTAL</td><td style={{ textAlign: 'right' }}>{formatCurrency(grandTotalRevenue)}</td></tr>
+              </tbody>
+            </table>
+            <h3>Payment Terms</h3>
+            <table className="preview-table">
+              <tbody>
+                <tr><td>Upfront ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
+                <tr><td>Sign-off ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
+              </tbody>
+            </table>
+            <div style={{ marginTop: 20, padding: 12, background: '#f8f9fa', borderRadius: 6 }}>
+              <strong>Internal:</strong> Profit: {formatCurrency(grossProfit)} | Margin: {formatPercent(grossMargin)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Client SOW Tab
+    function ClientSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, estimatedWeeks, clientToggles, setClientToggles, upfrontAmount, signoffAmount, maintenanceWindowsNeeded, totalOutageHours, saxSignatureData, saxSignerName, saxSignerTitle }) {
+      const canvasRef = useRef(null);
+      const [drawing, setDrawing] = useState(false);
+      useEffect(() => { const c = canvasRef.current; if (c) { const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); } }, []);
+      const startDraw = (e) => { const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.clientX - r.left, e.clientY - r.top); setDrawing(true); };
+      const draw = (e) => { if (!drawing) return; const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.lineTo(e.clientX - r.left, e.clientY - r.top); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke(); };
+      const stopDraw = () => setDrawing(false);
+      const clearSig = () => { const c = canvasRef.current; const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); };
+      const exportPDF = async () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'letter');
+        const el = document.getElementById('clientSOWDoc');
+        const canvas = await html2canvas(el, { scale: 2 });
+        const img = canvas.toDataURL('image/png');
+        const w = 190, h = (canvas.height * w) / canvas.width;
+        doc.addImage(img, 'PNG', 10, 10, w, h);
+        doc.save(`SAX_MA_SOW_${coverData.projectName || 'Project'}_${new Date().toISOString().split('T')[0]}.pdf`);
+      };
+      return (
+        <div>
+          <div className="toggle-panel">
+            <h4>📋 Display Options</h4>
+            <div className="toggle-grid">
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhases} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhases: e.target.checked }))} /><label>Phases</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhaseHours} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhaseHours: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Hours</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhasePrices} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhasePrices: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Prices</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showTimeline} onChange={(e) => setClientToggles(prev => ({ ...prev, showTimeline: e.target.checked }))} /><label>Timeline</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showMaintenanceWindows} onChange={(e) => setClientToggles(prev => ({ ...prev, showMaintenanceWindows: e.target.checked }))} /><label>Maint. Windows</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showOutageHours} onChange={(e) => setClientToggles(prev => ({ ...prev, showOutageHours: e.target.checked }))} /><label>Outage Hours</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPaymentTerms} onChange={(e) => setClientToggles(prev => ({ ...prev, showPaymentTerms: e.target.checked }))} /><label>Payment Terms</label></div>
+            </div>
+          </div>
+          <div style={{ marginBottom: 15, textAlign: 'right' }}><button className="btn btn-primary" onClick={exportPDF}>📄 Export PDF</button></div>
+          <div className="preview-document" id="clientSOWDoc">
+            <div className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'}</p><p><strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p></div>
+            {clientToggles.showPhases && (
+              <><h3>Project Phases</h3>
+              <table className="preview-table">
+                <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
+                <tbody>
+                  {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td>{clientToggles.showPhaseHours && <td>{p.hours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(p.cost)}</td>}</tr>)}
+                  <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}><td>Total</td>{clientToggles.showPhaseHours && <td>{totalHours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(laborRevenue)}</td>}</tr>
+                </tbody>
+              </table></>
+            )}
+            {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
+            {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
+              <><h3>Maintenance Requirements</h3>
+              {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
+              {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
+              {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
+            )}
+            <h3>Investment Summary</h3>
+            <div className="payment-summary">
+              <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
+              {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
+              {totalBillableExpenses > 0 && <div className="payment-row"><span>Expenses (est.)</span><span>{formatCurrency(totalBillableExpenses)}</span></div>}
+              <div className="payment-row total"><span>TOTAL INVESTMENT</span><span>{formatCurrency(grandTotalRevenue)}</span></div>
+            </div>
+            {clientToggles.showPaymentTerms && (
+              <><h3>Payment Terms</h3>
+              <table className="preview-table">
+                <tbody>
+                  <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
+                  <tr><td>Due Upon Completion ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
+                </tbody>
+              </table></>
+            )}
+            {coverData.engagementType === 'Fixed Fee' && (
+              <div className="fixed-fee-notice"><strong>Fixed Fee:</strong> Total investment of {formatCurrency(grandTotalRevenue)} shall <strong>not exceed</strong> this amount unless a Change Order is mutually agreed upon in writing.</div>
+            )}
+            {coverData.engagementType === 'T&M' && (
+              <div className="tm-notice"><strong>Time & Materials:</strong> Billed on actual time/materials.{coverData.tAndMNotToExceed > 0 && <> Not to exceed <strong>{formatCurrency(coverData.tAndMNotToExceed)}</strong> without approval.</>}<br /><br /><strong>Status:</strong> At {coverData.tAndMStatusThreshold}% of budget, SAX will provide status update.</div>
+            )}
+            {scopeData.variablesUnknowns && <><h3>Assumptions</h3><p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p></>}
+            <div className="signature-section">
+              <h3>Authorization</h3>
+              <p style={{ fontSize: '0.9em' }}>By signing, parties authorize work under these terms.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 20 }}>
+                <div>
+                  <p><strong>CLIENT</strong></p>
+                  <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
+                  <canvas ref={canvasRef} width={300} height={60} className="signature-box" onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw} />
+                  <button className="btn btn-secondary" onClick={clearSig} style={{ marginTop: 5, padding: '4px 10px', fontSize: '0.75em' }}>Clear</button>
+                  <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: ___________________________</p>
+                  <p style={{ fontSize: '0.85em' }}>Title: ___________________________</p>
+                  <p style={{ fontSize: '0.85em' }}>Date: ___________________________</p>
+                </div>
+                <div>
+                  <p><strong>SAX TECHNOLOGY</strong></p>
+                  <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
+                  {saxSignatureData ? <img src={saxSignatureData} alt="SAX Sig" style={{ border: '1px solid #9ca3af', borderRadius: 4, height: 60, background: '#f9fafb' }} /> : <div className="signature-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.75em' }}>[Set in Config]</div>}
+                  <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: {saxSignerName || '___________________________'}</p>
+                  <p style={{ fontSize: '0.85em' }}>Title: {saxSignerTitle || '___________________________'}</p>
+                  <p style={{ fontSize: '0.85em' }}>Date: {new Date().toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Change Order Tab
+    function ChangeOrderTab({ changeOrders, addChangeOrder, updateChangeOrder, deleteChangeOrder, rates, getEffectiveRate, changeOrdersTotal }) {
+      const addItem = (coId) => {
+        const co = changeOrders.find(c => c.id === coId);
+        if (co) {
+          const items = [...(co.items || []), { id: Date.now(), description: '', resourceClass: 'SE', hours: 0 }];
+          updateChangeOrder(coId, 'items', items);
+          updateChangeOrder(coId, 'amount', items.reduce((s, i) => s + ((parseFloat(i.hours) || 0) * getEffectiveRate(i.resourceClass)), 0));
+        }
+      };
+      const updateItem = (coId, itemId, field, value) => {
+        const co = changeOrders.find(c => c.id === coId);
+        if (co) {
+          const items = co.items.map(i => i.id === itemId ? { ...i, [field]: value } : i);
+          updateChangeOrder(coId, 'items', items);
+          updateChangeOrder(coId, 'amount', items.reduce((s, i) => s + ((parseFloat(i.hours) || 0) * getEffectiveRate(i.resourceClass)), 0));
+        }
+      };
+      const deleteItem = (coId, itemId) => {
+        const co = changeOrders.find(c => c.id === coId);
+        if (co) {
+          const items = co.items.filter(i => i.id !== itemId);
+          updateChangeOrder(coId, 'items', items);
+          updateChangeOrder(coId, 'amount', items.reduce((s, i) => s + ((parseFloat(i.hours) || 0) * getEffectiveRate(i.resourceClass)), 0));
+        }
+      };
+      return (
+        <div>
+          <h2 className="section-title">Change Orders</h2>
+          <div className="summary-cards" style={{ marginBottom: 20 }}>
+            <div className="summary-card"><div className="summary-card-label">Total COs</div><div className="summary-card-value">{changeOrders.length}</div></div>
+            <div className="summary-card"><div className="summary-card-label">Approved</div><div className="summary-card-value">{changeOrders.filter(c => c.approved).length}</div></div>
+            <div className="summary-card highlight"><div className="summary-card-label">Approved $</div><div className="summary-card-value">{formatCurrency(changeOrdersTotal)}</div></div>
+          </div>
+          <button className="btn btn-primary" onClick={addChangeOrder} style={{ marginBottom: 15 }}>+ New Change Order</button>
+          {changeOrders.length === 0 ? <div style={{ textAlign: 'center', padding: 30, color: '#6c757d' }}>No change orders yet.</div> : (
+            changeOrders.map(co => (
+              <div key={co.id} className="config-section" style={{ marginBottom: 15 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <input type="text" value={co.title} onChange={(e) => updateChangeOrder(co.id, 'title', e.target.value)} placeholder="CO Title" style={{ fontSize: '1.1em', fontWeight: 'bold', padding: '6px 10px', border: '2px solid #dee2e6', borderRadius: 6, width: 250 }} />
+                    {co.approved && <span style={{ background: '#28a745', color: 'white', padding: '3px 10px', borderRadius: 20, fontSize: '0.75em' }}>✓ APPROVED</span>}
+                  </div>
+                  <button className="btn btn-danger" onClick={() => deleteChangeOrder(co.id)}>Delete</button>
+                </div>
+                <div className="form-grid">
+                  <div className="form-group"><label>Reason</label><textarea rows={2} value={co.reason} onChange={(e) => updateChangeOrder(co.id, 'reason', e.target.value)} placeholder="Why needed..." /></div>
+                  <div className="form-group"><label>Description</label><textarea rows={2} value={co.description} onChange={(e) => updateChangeOrder(co.id, 'description', e.target.value)} placeholder="Work details..." /></div>
+                </div>
+                <div className="subsection-title">Line Items</div>
+                <table>
+                  <thead><tr><th></th><th>Description</th><th>Resource</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead>
+                  <tbody>
+                    {(co.items || []).map(i => (
+                      <tr key={i.id}>
+                        <td><button className="btn-danger" onClick={() => deleteItem(co.id, i.id)}>✕</button></td>
+                        <td><input type="text" className="inline-edit" value={i.description} onChange={(e) => updateItem(co.id, i.id, 'description', e.target.value)} placeholder="Task..." /></td>
+                        <td><select value={i.resourceClass} onChange={(e) => updateItem(co.id, i.id, 'resourceClass', e.target.value)}>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
+                        <td><input type="number" min="0" step="0.5" value={i.hours} onChange={(e) => updateItem(co.id, i.id, 'hours', parseFloat(e.target.value) || 0)} style={{ width: 60 }} /></td>
+                        <td className="currency">{formatCurrency(getEffectiveRate(i.resourceClass))}</td>
+                        <td className="currency">{formatCurrency((parseFloat(i.hours) || 0) * getEffectiveRate(i.resourceClass))}</td>
+                      </tr>
+                    ))}
+                    <tr className="grand-totals-row"><td colSpan={5} style={{ textAlign: 'right' }}>CO Total:</td><td className="currency">{formatCurrency(co.amount)}</td></tr>
+                  </tbody>
+                </table>
+                <button className="add-row-btn" onClick={() => addItem(co.id)}>+ Add Item</button>
+                <div style={{ marginTop: 15, padding: 12, background: '#e8f5e9', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 15, flexWrap: 'wrap' }}>
+                  <div className="checkbox-group"><input type="checkbox" checked={co.approved} onChange={(e) => updateChangeOrder(co.id, 'approved', e.target.checked)} /><label><strong>Approved</strong></label></div>
+                  {co.approved && <>
+                    <div className="form-group" style={{ marginBottom: 0 }}><label>By</label><input type="text" value={co.approvedBy} onChange={(e) => updateChangeOrder(co.id, 'approvedBy', e.target.value)} placeholder="Name..." style={{ width: 120 }} /></div>
+                    <div className="form-group" style={{ marginBottom: 0 }}><label>Date</label><input type="date" value={co.approvedDate} onChange={(e) => updateChangeOrder(co.id, 'approvedDate', e.target.value)} /></div>
+                  </>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    }
+    
+    // Render
+    ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>
