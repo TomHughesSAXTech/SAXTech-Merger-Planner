@@ -1,5 +1,7 @@
 # M&A IT Onboarding AI System
 
+> CI nudge: trivial change to trigger latest pipeline run.
+
 An AI-powered system that creates dynamic decision trees for M&A IT infrastructure onboarding through intelligent discovery conversations.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
