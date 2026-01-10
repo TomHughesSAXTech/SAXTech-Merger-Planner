@@ -45,6 +45,38 @@ module.exports = async function (context, req) {
     const executionPlan = session.executionPlan;
     const discoveryData = session.discoveryData || {};
 
+    // Helper: try to infer a customer/company name from discovery data
+    function inferCustomerFromDiscovery(dd) {
+      try {
+        const values = [];
+        const stack = [dd];
+        while (stack.length) {
+          const cur = stack.pop();
+          if (!cur) continue;
+          if (typeof cur === 'string') {
+            values.push({ key: '', value: cur });
+          } else if (Array.isArray(cur)) {
+            cur.forEach(v => stack.push(v));
+          } else if (typeof cur === 'object') {
+            Object.entries(cur).forEach(([k, v]) => {
+              if (typeof v === 'string') {
+                values.push({ key: k.toLowerCase(), value: v });
+              } else {
+                stack.push(v);
+              }
+            });
+          }
+        }
+        // Prefer keys that look like company/client
+        const hit = values.find(x => x.key.includes('company') || x.key.includes('client') || x.key.includes('organization'));
+        return hit ? hit.value : null;
+      } catch {
+        return null;
+      }
+    }
+
+    const inferredCustomer = inferCustomerFromDiscovery(discoveryData);
+
     // Use Azure OpenAI to transform execution plan into SOW builder schema
     const client = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
 
@@ -118,8 +150,8 @@ Rules:
       let nextId = 1;
       sow = {
         coverData: {
-          projectName: session.projectName || '',
-          customerId: session.customerId || '',
+          projectName: session.projectName || (inferredCustomer ? `${inferredCustomer} – M&A IT Onboarding` : ''),
+          customerId: session.customerId || inferredCustomer || '',
           description: 'Generated from M&A onboarding execution plan.'
         },
         scopeData: {
@@ -138,6 +170,7 @@ Rules:
               : role.toLowerCase().includes('cxo') || role.toLowerCase().includes('pm') ? 'CXO'
               : 'SE';
             const hours = typeof task === 'object' && typeof task.hours === 'number' ? task.hours : 4;
+            const risk = typeof task === 'object' && typeof task.risk === 'string' ? task.risk : '';
             return {
               id: nextId++,
               description: desc,
@@ -145,11 +178,33 @@ Rules:
               hours,
               afterHours: false,
               maintenanceRequired: false,
-              outageHours: 0
+              outageHours: 0,
+              risk
             };
           })
         }))
       };
+    }
+
+    // Post-process SOW from either AI or fallback: ensure project/deliverables inferred when missing
+    try {
+      if (sow) {
+        if (sow.coverData) {
+          if (!sow.coverData.customerId && inferredCustomer) {
+            sow.coverData.customerId = inferredCustomer;
+          }
+          if (!sow.coverData.projectName && inferredCustomer) {
+            sow.coverData.projectName = `${inferredCustomer} – M&A IT Onboarding`;
+          }
+        }
+        if (sow.scopeData) {
+          if ((!sow.scopeData.deliverables || !sow.scopeData.deliverables.length) && Array.isArray(executionPlan.phases)) {
+            sow.scopeData.deliverables = executionPlan.phases.map(p => p.name || p.id).filter(Boolean);
+          }
+        }
+      }
+    } catch (ppErr) {
+      context.log('Post-processing SOW enhancements failed:', ppErr.message);
     }
 
     context.res = {

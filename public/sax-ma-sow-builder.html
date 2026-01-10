@@ -190,6 +190,15 @@
     .phase-header {
       background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
     }
+
+    .phase-header.risk-high,
+    .phase-header.risk-critical {
+      background: linear-gradient(135deg, #ff6b6b 0%, #c0392b 100%) !important;
+    }
+
+    .phase-header.risk-medium {
+      background: linear-gradient(135deg, #ffeaa7 0%, #e1b12c 100%) !important;
+    }
     
     .phase-header td {
       padding: 10px 8px;
@@ -1158,14 +1167,35 @@
             <div className="summary-card"><div className="summary-card-label">Avg Rate/Hr</div><div className="summary-card-value">{formatCurrency(avgHourlyRate)}</div></div>
             <div className="summary-card highlight"><div className="summary-card-label">Labor Revenue</div><div className="summary-card-value">{formatCurrency(laborRevenue)}</div></div>
           </div>
-          <table>
+      <table>
             <thead><tr><th style={{ width: 25 }}></th><th>Description</th><th style={{ width: 70 }}>Resource</th><th style={{ width: 55 }}>Hours</th><th style={{ width: 70 }}>Rate</th><th style={{ width: 80 }}>Extended</th><th style={{ width: 35 }}>AH</th><th style={{ width: 35 }}>Mnt</th><th style={{ width: 50 }}>Outage</th></tr></thead>
             <tbody>
               {serviceItems.map(phase => {
                 const pt = phaseTotals.find(p => p.id === phase.id) || { hours: 0, cost: 0 };
+                const riskLevels = (phase.subItems || []).map(i => (i.risk || '').toLowerCase());
+                const hasCritical = riskLevels.includes('critical');
+                const hasHigh = riskLevels.includes('high');
+                const hasMedium = riskLevels.includes('medium');
+                let phaseRiskClass = '';
+                let phaseRiskLabel = '';
+                if (hasCritical) { phaseRiskClass = 'risk-critical'; phaseRiskLabel = 'Risk: Critical'; }
+                else if (hasHigh) { phaseRiskClass = 'risk-high'; phaseRiskLabel = 'Risk: High'; }
+                else if (hasMedium) { phaseRiskClass = 'risk-medium'; phaseRiskLabel = 'Risk: Medium'; }
                 return (
                   <React.Fragment key={phase.id}>
-                    <tr className="phase-header"><td><button className="btn-danger" onClick={() => deletePhase(phase.id)}>✕</button></td><td colSpan={8}><input type="text" className="inline-edit" value={phase.phase} onChange={(e) => updatePhaseName(phase.id, e.target.value)} style={{ fontWeight: 'bold', background: 'transparent' }} /></td></tr>
+                    <tr className={`phase-header ${phaseRiskClass}`}>
+                      <td><button className="btn-danger" onClick={() => deletePhase(phase.id)}>✕</button></td>
+                      <td colSpan={8}>
+                        <input
+                          type="text"
+                          className="inline-edit"
+                          value={phase.phase}
+                          onChange={(e) => updatePhaseName(phase.id, e.target.value)}
+                          style={{ fontWeight: 'bold', background: 'transparent' }}
+                        />
+                        {phaseRiskLabel && <span style={{ marginLeft: 12, fontSize: '0.8rem', color: '#c0392b' }}>{phaseRiskLabel}</span>}
+                      </td>
+                    </tr>
                     {phase.subItems.map(item => {
                       const rate = getEffectiveRate(item.resourceClass);
                       return (
