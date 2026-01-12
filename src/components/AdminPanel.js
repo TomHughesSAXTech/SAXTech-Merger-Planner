@@ -89,11 +89,10 @@ const AdminPanel = () => {
         security: 0.20,
         communication: 0.15
       },
-      aiModel: 'gpt-4-turbo',
+      aiModel: 'gpt-4.1-mini',
       maxContextMessages: 10,
       openAi: {
         endpoint: '',
-        deployment: '',
         keySlot: 'primary'
       }
     }
@@ -446,7 +445,7 @@ const AdminPanel = () => {
             <div className="settings-card">
               <h3>AI Configuration</h3>
               <div className="setting-field">
-                <label>OpenAI Model</label>
+                <label>OpenAI Model / Deployment</label>
                 <select
                   value={config.globalSettings.aiModel}
                   onChange={(e) => setConfig({
@@ -454,6 +453,8 @@ const AdminPanel = () => {
                     globalSettings: { ...config.globalSettings, aiModel: e.target.value }
                   })}
                 >
+                  <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                  <option value="gpt-4.1">GPT-4.1</option>
                   <option value="gpt-4-turbo">GPT-4 Turbo</option>
                   <option value="gpt-4">GPT-4</option>
                   <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
@@ -485,24 +486,6 @@ const AdminPanel = () => {
                       openAi: {
                         ...(config.globalSettings.openAi || {}),
                         endpoint: e.target.value
-                      }
-                    }
-                  })}
-                />
-              </div>
-              <div className="setting-field">
-                <label>OpenAI Deployment Name Override (optional)</label>
-                <input
-                  type="text"
-                  placeholder="Leave blank to use AZURE_OPENAI_DEPLOYMENT"
-                  value={config.globalSettings.openAi?.deployment || ''}
-                  onChange={(e) => setConfig({
-                    ...config,
-                    globalSettings: {
-                      ...config.globalSettings,
-                      openAi: {
-                        ...(config.globalSettings.openAi || {}),
-                        deployment: e.target.value
                       }
                     }
                   })}

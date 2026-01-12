@@ -23,8 +23,9 @@ module.exports = async function (context, req) {
         } catch {}
 
         const openAiSettings = configData?.globalSettings?.openAi || {};
+        const modelFromConfig = configData?.globalSettings?.aiModel;
         const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
-        const deploymentId = openAiSettings.deployment || defaultDeployment;
+        const deploymentId = modelFromConfig || defaultDeployment;
         let openAIKey = keyPrimary;
         if (openAiSettings.keySlot === 'secondary' && keySecondary) {
             openAIKey = keySecondary;

@@ -41,10 +41,11 @@ module.exports = async function (context, req) {
         // Load configuration from Cosmos DB
         const config = await loadConfig(cosmosClient);
 
-        // Determine OpenAI settings, allowing overrides from config.globalSettings.openAi
+        // Determine OpenAI settings, using aiModel as primary deployment selector
         const openAiSettings = config?.globalSettings?.openAi || {};
+        const modelFromConfig = config?.globalSettings?.aiModel;
         const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
-        const deploymentName = openAiSettings.deployment || defaultDeployment;
+        const deploymentName = modelFromConfig || defaultDeployment;
         let openAIKey = keyPrimary;
         if (openAiSettings.keySlot === 'secondary' && keySecondary) {
             openAIKey = keySecondary;
