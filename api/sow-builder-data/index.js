@@ -3,9 +3,10 @@ const { CosmosClient } = require('@azure/cosmos');
 
 module.exports = async function (context, req) {
   try {
-    const openAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
-    const openAIKey = process.env.AZURE_OPENAI_KEY;
-    const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT;
+    const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
+    const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
+    const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
     const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
     const cosmosKey = process.env.COSMOS_KEY;
 
@@ -31,6 +32,26 @@ module.exports = async function (context, req) {
     const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
     const database = cosmosClient.database('MAOnboarding');
     const container = database.container('Sessions');
+
+    const { resource: session } = await container.item(sessionId, sessionId).read();
+
+    // Load configuration for OpenAI overrides
+    let configData = null;
+    try {
+      const configContainer = database.container('Configurations');
+      const { resource: cfg } = await configContainer.item('discovery_config', 'discovery_config').read();
+      configData = cfg.data;
+    } catch {}
+
+    const openAiSettings = configData?.globalSettings?.openAi || {};
+    const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
+    const deploymentName = openAiSettings.deployment || defaultDeployment;
+    let openAIKey = keyPrimary;
+    if (openAiSettings.keySlot === 'secondary' && keySecondary) {
+      openAIKey = keySecondary;
+    }
+
+    const client = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
 
     const { resource: session } = await container.item(sessionId, sessionId).read();
     if (!session || !session.executionPlan) {

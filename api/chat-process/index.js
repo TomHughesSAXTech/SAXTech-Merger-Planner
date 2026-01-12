@@ -24,13 +24,13 @@ async function loadConfig(cosmosClient) {
 
 module.exports = async function (context, req) {
     try {
-        const openAIEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
-        const openAIKey = process.env.AZURE_OPENAI_KEY;
-        const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT;
+        const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+        const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
+        const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
+        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
-        const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
         const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
         const database = cosmosClient.database('MAOnboarding');
         const container = database.container('Sessions');
@@ -40,6 +40,17 @@ module.exports = async function (context, req) {
         
         // Load configuration from Cosmos DB
         const config = await loadConfig(cosmosClient);
+
+        // Determine OpenAI settings, allowing overrides from config.globalSettings.openAi
+        const openAiSettings = config?.globalSettings?.openAi || {};
+        const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
+        const deploymentName = openAiSettings.deployment || defaultDeployment;
+        let openAIKey = keyPrimary;
+        if (openAiSettings.keySlot === 'secondary' && keySecondary) {
+            openAIKey = keySecondary;
+        }
+
+        const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
         
         // Get category prompts from config or use defaults
         const categoryConfig = config?.categories?.find(c => c.id === category);

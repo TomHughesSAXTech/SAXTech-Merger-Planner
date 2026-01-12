@@ -90,7 +90,12 @@ const AdminPanel = () => {
         communication: 0.15
       },
       aiModel: 'gpt-4-turbo',
-      maxContextMessages: 10
+      maxContextMessages: 10,
+      openAi: {
+        endpoint: '',
+        deployment: '',
+        keySlot: 'primary'
+      }
     }
   });
 
@@ -466,6 +471,61 @@ const AdminPanel = () => {
                   min="1"
                   max="50"
                 />
+              </div>
+              <div className="setting-field">
+                <label>OpenAI Endpoint Override (optional)</label>
+                <input
+                  type="text"
+                  placeholder="Leave blank to use AZURE_OPENAI_ENDPOINT from app settings"
+                  value={config.globalSettings.openAi?.endpoint || ''}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    globalSettings: {
+                      ...config.globalSettings,
+                      openAi: {
+                        ...(config.globalSettings.openAi || {}),
+                        endpoint: e.target.value
+                      }
+                    }
+                  })}
+                />
+              </div>
+              <div className="setting-field">
+                <label>OpenAI Deployment Name Override (optional)</label>
+                <input
+                  type="text"
+                  placeholder="Leave blank to use AZURE_OPENAI_DEPLOYMENT"
+                  value={config.globalSettings.openAi?.deployment || ''}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    globalSettings: {
+                      ...config.globalSettings,
+                      openAi: {
+                        ...(config.globalSettings.openAi || {}),
+                        deployment: e.target.value
+                      }
+                    }
+                  })}
+                />
+              </div>
+              <div className="setting-field">
+                <label>Active OpenAI Key Slot</label>
+                <select
+                  value={config.globalSettings.openAi?.keySlot || 'primary'}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    globalSettings: {
+                      ...config.globalSettings,
+                      openAi: {
+                        ...(config.globalSettings.openAi || {}),
+                        keySlot: e.target.value
+                      }
+                    }
+                  })}
+                >
+                  <option value="primary">Primary (uses AZURE_OPENAI_KEY or AZURE_OPENAI_KEY_PRIMARY)</option>
+                  <option value="secondary">Secondary (uses AZURE_OPENAI_KEY_SECONDARY)</option>
+                </select>
               </div>
             </div>
           </div>
