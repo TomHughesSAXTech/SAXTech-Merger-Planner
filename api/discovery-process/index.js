@@ -1,12 +1,35 @@
 const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
 
+// Helper to call OpenAI with a primary deployment and gracefully fall back
+// to a default deployment if the primary deployment does not exist in the
+// target Azure OpenAI resource.
+async function getChatCompletionsWithFallback(client, primaryDeployment, fallbackDeployment, messages, options, context, label) {
+    try {
+        if (!primaryDeployment && !fallbackDeployment) {
+            throw new Error('No OpenAI deployment configured. Set aiModel or AZURE_OPENAI_DEPLOYMENT.');
+        }
+
+        const deploymentToUse = primaryDeployment || fallbackDeployment;
+        return await client.getChatCompletions(deploymentToUse, messages, options);
+    } catch (err) {
+        const message = (err && err.message ? err.message : '').toLowerCase();
+        const missingDeployment = message.includes('deployment') && message.includes('does not exist');
+
+        if (missingDeployment && fallbackDeployment && primaryDeployment && fallbackDeployment !== primaryDeployment) {
+            context.log.warn(`Primary OpenAI deployment "${primaryDeployment}" not found, retrying with fallback deployment "${fallbackDeployment}" for ${label}.`);
+            return await client.getChatCompletions(fallbackDeployment, messages, options);
+        }
+
+        throw err;
+    }
+}
+
 module.exports = async function (context, req) {
     try {
-        const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
         const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
@@ -24,7 +47,7 @@ module.exports = async function (context, req) {
 
         const openAiSettings = configData?.globalSettings?.openAi || {};
         const modelFromConfig = configData?.globalSettings?.aiModel;
-        const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
+        const openAIEndpoint = 'https://client-fcs.cognitiveservices.azure.com/';
         const deploymentId = modelFromConfig || defaultDeployment;
         let openAIKey = keyPrimary;
         if (openAiSettings.keySlot === 'secondary' && keySecondary) {
@@ -42,8 +65,10 @@ module.exports = async function (context, req) {
         const prompt = buildDiscoveryPrompt(category, response, currentTree);
         
         // Call Azure OpenAI
-        const completion = await openAIClient.getChatCompletions(
+        const completion = await getChatCompletionsWithFallback(
+            openAIClient,
             deploymentId,
+            defaultDeployment,
             [
                 {
                     role: 'system',
@@ -59,7 +84,9 @@ module.exports = async function (context, req) {
                 max_tokens: 2000,
                 functions: [getTreeGenerationFunction()],
                 function_call: { name: 'generate_decision_nodes' }
-            }
+            },
+            context,
+            'discovery-process decision tree'
         );
 
         const functionCall = completion.choices[0].message.functionCall;

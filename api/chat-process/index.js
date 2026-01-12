@@ -22,12 +22,35 @@ async function loadConfig(cosmosClient) {
     }
 }
 
+// Helper to call OpenAI with a primary deployment and gracefully fall back
+// to a default deployment if the primary deployment does not exist in the
+// target Azure OpenAI resource.
+async function getChatCompletionsWithFallback(client, primaryDeployment, fallbackDeployment, messages, options, context, label) {
+    try {
+        if (!primaryDeployment && !fallbackDeployment) {
+            throw new Error('No OpenAI deployment configured. Set aiModel or AZURE_OPENAI_DEPLOYMENT.');
+        }
+
+        const deploymentToUse = primaryDeployment || fallbackDeployment;
+        return await client.getChatCompletions(deploymentToUse, messages, options);
+    } catch (err) {
+        const message = (err && err.message ? err.message : '').toLowerCase();
+        const missingDeployment = message.includes('deployment') && message.includes('does not exist');
+
+        if (missingDeployment && fallbackDeployment && primaryDeployment && fallbackDeployment !== primaryDeployment) {
+            context.log.warn(`Primary OpenAI deployment "${primaryDeployment}" not found, retrying with fallback deployment "${fallbackDeployment}" for ${label}.`);
+            return await client.getChatCompletions(fallbackDeployment, messages, options);
+        }
+
+        throw err;
+    }
+}
+
 module.exports = async function (context, req) {
     try {
-        const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
         const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
@@ -44,7 +67,7 @@ module.exports = async function (context, req) {
         // Determine OpenAI settings, using aiModel as primary deployment selector
         const openAiSettings = config?.globalSettings?.openAi || {};
         const modelFromConfig = config?.globalSettings?.aiModel;
-        const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
+        const openAIEndpoint = 'https://client-fcs.cognitiveservices.azure.com/';
         const deploymentName = modelFromConfig || defaultDeployment;
         let openAIKey = keyPrimary;
         if (openAiSettings.keySlot === 'secondary' && keySecondary) {
@@ -58,6 +81,14 @@ module.exports = async function (context, req) {
         const systemPrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
+
+        // Ensure legacy or partially initialized sessions still have the expected structures
+        if (!session.messages) {
+            session.messages = [];
+        }
+        if (!session.discoveryData) {
+            session.discoveryData = {};
+        }
         
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -65,10 +96,18 @@ module.exports = async function (context, req) {
             { role: 'user', content: message }
         ];
 
-        const completion = await openAIClient.getChatCompletions(deploymentName, messages, {
-            maxTokens: 500,
-            temperature: 0.7
-        });
+        const completion = await getChatCompletionsWithFallback(
+            openAIClient,
+            deploymentName,
+            defaultDeployment,
+            messages,
+            {
+                maxTokens: 500,
+                temperature: 0.7
+            },
+            context,
+            'chat-process main response'
+        );
 
         const response = completion.choices[0].message.content;
         
@@ -91,10 +130,18 @@ module.exports = async function (context, req) {
         ];
 
         try {
-            const extractionResult = await openAIClient.getChatCompletions(deploymentName, extractionMessages, {
-                maxTokens: 300,
-                temperature: 0.2
-            });
+            const extractionResult = await getChatCompletionsWithFallback(
+                openAIClient,
+                deploymentName,
+                defaultDeployment,
+                extractionMessages,
+                {
+                    maxTokens: 300,
+                    temperature: 0.2
+                },
+                context,
+                'chat-process discovery extraction'
+            );
 
             const extracted = JSON.parse(extractionResult.choices[0].message.content);
             if (extracted && Object.keys(extracted).length > 0) {
@@ -111,19 +158,25 @@ module.exports = async function (context, req) {
 
         // Check completion based on config criteria or default keywords
         const completionCriteria = categoryConfig?.completionCriteria;
+        const normalizedMessage = message.toLowerCase();
+        const userSignaledDone = normalizedMessage.includes('done') ||
+            normalizedMessage.includes('complete') ||
+            normalizedMessage.includes('finished') ||
+            normalizedMessage.includes('next');
+
         if (completionCriteria) {
             const factCount = Object.keys(session.discoveryData[category] || {}).length;
             const hasRequiredFields = completionCriteria.requiredFields?.every(field => 
                 session.discoveryData[category]?.[field]
             ) ?? true;
-            
-            if (factCount >= (completionCriteria.minFacts || 3) && hasRequiredFields) {
+
+            // Require BOTH: enough extracted facts AND an explicit user signal to move on.
+            if (userSignaledDone && factCount >= (completionCriteria.minFacts || 3) && hasRequiredFields) {
                 categoryComplete = true;
             }
         } else {
-            // Fallback to keyword detection
-            if (message.toLowerCase().includes('done') || message.toLowerCase().includes('complete') || 
-                message.toLowerCase().includes('finished') || message.toLowerCase().includes('next')) {
+            // Fallback to simple keyword detection when no structured criteria exist
+            if (userSignaledDone) {
                 categoryComplete = true;
             }
         }
