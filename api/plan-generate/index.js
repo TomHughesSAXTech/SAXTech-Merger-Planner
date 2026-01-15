@@ -63,8 +63,42 @@ module.exports = async function (context, req) {
 
         const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
 
+        // Baseline template to align phases and hours with a typical
+        // two-server, ~5-user M&A onboarding. This is a calibration aid,
+        // not a hard constraint.
+        const baselineHoursTemplate = `
+REFERENCE PROJECT (CALIBRATION ONLY)
+- Scenario: 2 servers, ~5 users, one primary office plus small satellite.
+- Phases and typical effort:
+  - Phase 0: Pre-Migration & Discovery .......... ~12 hours
+  - Phase 1: Server Migration (Deliverable 1) ... ~42 hours
+  - Phase 2: User Onboarding (5 users) .......... ~22.5 hours
+  - Phase 3: Data Migration/Lockdown/Backup ..... ~18 hours
+  - Phase 4: Email/OneDrive/Website/DNS Cutover . ~27.5 hours
+  - Phase 5: Post-Migration & Stabilization ..... ~29.5 hours
+  - Total baseline effort ........................ ~150–155 hours
+
+Deliverable mapping (reference):
+- Deliverable 1 – Two Server Migration (~56 hours)
+- Deliverable 2 – User Onboarding (~27.5 hours)
+- Deliverable 3 – Data Migration/Lockdown/Backup (~21 hours)
+- Deliverable 4 – Email/OneDrive/Website/DNS (~31.5 hours)
+
+Use this as a sanity check: for a similarly sized environment, the
+sum of all task hours across all phases should normally fall between
+~135 and ~170 hours unless discovery clearly indicates materially more
+or less work (many more users, servers, complex VPN, heavy app issues, etc.).`;
+
         const planPrompt = `
-Based on this M&A onboarding discovery data and decision tree, generate a detailed execution plan.
+You are an M&A integration planning expert. Create a professional,
+structured execution plan suitable for feeding into a SOW builder.
+
+First, use the following reference project to calibrate your
+phases and hours for a small (two-server, five-user) environment:
+
+${baselineHoursTemplate}
+
+Now analyze the actual engagement details below.
 
 Discovery Data (JSON):
 ${JSON.stringify(discoveryData, null, 2)}
@@ -73,19 +107,35 @@ Decision Tree Summary:
 ${decisionTree.nodes.length} nodes, ${decisionTree.edges.length} edges
 
 Generate an execution plan with:
-1. Phases (sequential high-level stages)
-2. Tasks within each phase with dependencies
-3. Resource requirements
-4. Estimated timeline
-5. Risk factors
-6. ConnectWise ticket structure
+1. Phases that follow this structure where appropriate:
+   - Phase 0: Pre-Migration & Discovery
+   - Phase 1: Server Migration (Deliverable 1)
+   - Phase 2: User Onboarding (Deliverable 2)
+   - Phase 3: Data Migration/Lockdown/Backup (Deliverable 3)
+   - Phase 4: Email/OneDrive/Website/DNS Cutover (Deliverable 4)
+   - Phase 5: Post-Migration & Stabilization
+   If the environment is substantially larger or smaller, you may
+   split/merge phases, but keep the naming and ordering intuitive.
+2. Tasks within each phase with realistic hours and roles.
+3. Dependencies between tasks (by id) when order matters.
+4. High-level timeline summary (days/weeks).
+5. Risk factors.
+6. ConnectWise ticket recommendations.
+
+IMPORTANT HOUR GUIDANCE:
+- For environments similar in size to the reference (2 servers, ~5
+  users), try to keep the total sum of all task hours close to the
+  baseline band (~135–170 hours), adjusted up or down based on the
+  actual discovery (more users, more servers, more complexity).
+- Each task MUST include an estimated hour count and role so that
+  downstream SOW tooling can roll up labor and margin.
 
 Return STRICT JSON with this shape (no comments, no extra fields):
 {
   "phases": [
     {
-      "id": "phase1",
-      "name": "Planning",
+      "id": "phase0",
+      "name": "Pre-Migration & Discovery",
       "description": "high level description of the phase",
       "tasks": [
         {

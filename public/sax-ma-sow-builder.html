@@ -1372,6 +1372,7 @@
         { id: 'products', label: 'Products' },
         { id: 'expenses', label: 'Expenses' },
         { id: 'margin', label: 'Margin' },
+        { id: 'totals', label: 'Totals' },
         { id: 'rates', label: 'Rates' },
         { id: 'config', label: '⚙️ Config' },
         { id: 'preview', label: 'Preview' },
@@ -1466,6 +1467,50 @@
             <div className="header"><span className="robot-icon">📊</span><h1>Margin Estimator</h1><p>Project Profitability Analysis</p></div>
             <div className="content-area">
               <MarginTab rates={rates} coverData={coverData} serviceItems={serviceItems} calcExpenseTotal={calcExpenseTotal} getEffectiveRate={getEffectiveRate} laborRevenue={laborRevenue} laborCost={laborCost} productsTotal={productsTotal} productsCost={productsCost} totalBillableExpenses={totalBillableExpenses} totalNonBillableExpenses={totalNonBillableExpenses} grossProfit={grossProfit} grossMargin={grossMargin} />
+            </div>
+          </div>
+
+          {/* Totals Tab */}
+          <div className={`container ${activeTab === 'totals' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">⏱️</span><h1>Hours & Effort Summary</h1><p>Effective totals by phase and overall</p></div>
+            <div className="content-area">
+              <div className="summary-cards" style={{ marginBottom: 20 }}>
+                <div className="summary-card"><div className="summary-card-label">Total Hours</div><div className="summary-card-value">{totalHours}</div></div>
+                <div className="summary-card"><div className="summary-card-label">Estimated Duration</div><div className="summary-card-value">{estimatedWeeks} wks</div></div>
+                <div className="summary-card"><div className="summary-card-label">Labor Revenue</div><div className="summary-card-value">{formatCurrency(laborRevenue)}</div></div>
+                <div className="summary-card"><div className="summary-card-label">Products</div><div className="summary-card-value">{formatCurrency(productsTotal)}</div></div>
+                <div className="summary-card"><div className="summary-card-label">Billable Expenses</div><div className="summary-card-value">{formatCurrency(totalBillableExpenses)}</div></div>
+                <div className="summary-card highlight"><div className="summary-card-label">Total Sell</div><div className="summary-card-value">{formatCurrency(grandTotalRevenue)}</div></div>
+                <div className="summary-card highlight"><div className="summary-card-label">Gross Margin</div><div className="summary-card-value" style={{ color: grossMargin >= coverData.targetGM ? '#27ae60' : '#e74c3c' }}>{formatPercent(grossMargin)}</div></div>
+              </div>
+
+              <h2 className="section-title">Phase-Level Hours</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Phase</th>
+                    <th className="number">Hours</th>
+                    <th className="currency">Labor Revenue</th>
+                    <th className="currency">Outage Hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {phaseTotals.map(p => (
+                    <tr key={p.id}>
+                      <td>{p.name}</td>
+                      <td className="number">{p.hours}</td>
+                      <td className="currency">{formatCurrency(p.cost)}</td>
+                      <td className="number">{p.outageHours || 0}</td>
+                    </tr>
+                  ))}
+                  <tr className="grand-totals-row">
+                    <td>Total</td>
+                    <td className="number">{totalHours}</td>
+                    <td className="currency">{formatCurrency(laborRevenue)}</td>
+                    <td className="number">{totalOutageHours}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
           
