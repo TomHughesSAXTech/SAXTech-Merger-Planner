@@ -1752,7 +1752,14 @@
                     ? null
                     : null}
                     {phase.subItems.map(item => {
-                      const rate = getEffectiveRate(item.resourceClass);
+                      const baseRate = getEffectiveRate(item.resourceClass);
+                      const classConfig = rates[item.resourceClass];
+                      const afterHoursPct = classConfig && typeof classConfig.afterHoursPercent === 'number'
+                        ? classConfig.afterHoursPercent
+                        : 0;
+                      const rate = item.afterHours && afterHoursPct > 0
+                        ? baseRate * (1 + afterHoursPct / 100)
+                        : baseRate;
                       const itemId = item.id;
                       return (
                         <React.Fragment key={itemId}>
