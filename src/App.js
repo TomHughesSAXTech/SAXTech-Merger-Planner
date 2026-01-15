@@ -102,6 +102,28 @@ function App() {
 
       const loadedDiscovery = data.discoveryData || {};
       setDiscoveryData(loadedDiscovery);
+
+      // Ensure root node exists when resuming an existing session
+      const rootNode = {
+        id: 'root',
+        type: 'input',
+        data: {
+          label: 'M&A Discovery',
+          status: 'active',
+          description: 'Starting point for IT infrastructure discovery'
+        },
+        position: { x: 0, y: 0 },
+        style: {
+          background: '#0078D4',
+          color: 'white',
+          border: '2px solid #005A9E',
+          borderRadius: '8px',
+          padding: '10px'
+        }
+      };
+      setNodes([rootNode]);
+      setEdges([]);
+
       Object.entries(loadedDiscovery).forEach(([category, categoryData]) => {
         updateCategoryNode(category, categoryData);
       });
@@ -368,7 +390,7 @@ function App() {
     if (!name) return;
     setIsSavingPlan(true);
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-save', {
+      const response = await fetch('/api/plan-history-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, name, nodes, edges })
@@ -390,7 +412,7 @@ function App() {
   const loadPlanHistory = async () => {
     if (!sessionId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-list', {
+      const response = await fetch('/api/plan-history-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId })
@@ -410,7 +432,7 @@ function App() {
   const applyHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-load', {
+      const response = await fetch('/api/plan-history-load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })
@@ -436,7 +458,7 @@ function App() {
   const deleteHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-delete', {
+      const response = await fetch('/api/plan-history-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })
