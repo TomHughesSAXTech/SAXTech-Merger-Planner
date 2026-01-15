@@ -75,7 +75,15 @@ function App() {
   const loadConfig = async () => {
     try {
       const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('Failed to load config: HTTP', response.status);
+        return;
+      }
+      const data = await response.json().catch((err) => {
+        console.error('Failed to parse config-get response:', err);
+        return null;
+      });
+      if (!data) return;
       setConfig(data);
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -89,7 +97,18 @@ function App() {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('Failed to initialize session: HTTP', response.status);
+        return;
+      }
+      const data = await response.json().catch((err) => {
+        console.error('Failed to parse session-init response:', err);
+        return null;
+      });
+      if (!data || !data.sessionId) {
+        console.error('Session-init response missing sessionId');
+        return;
+      }
       console.log('[DEBUG] Session initialized:', data.sessionId);
       setSessionId(data.sessionId);
       
@@ -122,16 +141,26 @@ function App() {
     if (!data || Object.keys(data).length === 0) return;
 
     const entries = Object.entries(data || {});
-    const summaryParts = entries.slice(0, 3).map(([key, value]) => {
+    const summaryParts = entries.slice(0, 4).map(([key, value]) => {
       const formattedKey = key.replace(/_/g, ' ');
-      const stringValue = Array.isArray(value)
-        ? value.join(', ')
-        : typeof value === 'object'
-          ? '[object]'
-          : String(value);
+      let stringValue;
+
+      if (Array.isArray(value)) {
+        stringValue = value.join(', ');
+      } else if (value && typeof value === 'object') {
+        // Special handling for common "POC"-style objects with a name/role
+        if (typeof value.name === 'string') {
+          stringValue = value.role ? `${value.name} (${value.role})` : value.name;
+        } else {
+          stringValue = '[object]';
+        }
+      } else {
+        stringValue = String(value);
+      }
+
       return `${formattedKey}: ${stringValue}`;
     });
-    const summary = summaryParts.join(' • ');
+    const summary = summaryParts.join('\n');
 
     const newNode = {
       id: `${category}-node`,

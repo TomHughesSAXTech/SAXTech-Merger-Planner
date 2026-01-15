@@ -179,6 +179,7 @@ body {
   color: var(--neutral-light);
   margin-bottom: 0.5rem;
   line-height: 1.4;
+  white-space: pre-line; /* respect newlines in node summaries */
 }
 
 .node-risk {
