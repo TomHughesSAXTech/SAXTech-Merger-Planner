@@ -718,6 +718,85 @@
         throw err;
       }
     }
+
+    const getMaSowServicesTemplateUrl = () =>
+      `${azureBlobConfig.baseUrl}/${azureBlobConfig.containerName}/ma-sow-services-template.json?${azureBlobConfig.sasToken}`;
+
+    async function loadDefaultServicesTemplateFromBlob() {
+      try {
+        const url = getMaSowServicesTemplateUrl();
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        }
+        if (response.status === 404) {
+          console.log('📋 No MA SOW services template found in blob; falling back to built-in template.');
+          return null;
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      } catch (err) {
+        console.error('❌ Failed to load MA SOW services template from blob:', err);
+        return null;
+      }
+    }
+
+    async function saveDefaultServicesTemplateToBlob(serviceItems) {
+      try {
+        const url = getMaSowServicesTemplateUrl();
+        const payload = {
+          version: '1.0',
+          lastUpdated: new Date().toISOString(),
+          serviceItems,
+        };
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'x-ms-blob-type': 'BlockBlob',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload, null, 2),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`HTTP ${response.status}: ${text}`);
+        }
+        console.log('✅ Saved MA SOW default services template to Azure Blob Storage');
+        return true;
+      } catch (err) {
+        console.error('❌ Failed to save MA SOW services template to blob:', err);
+        throw err;
+      }
+    }
+
+    const bakedInDefaultServiceItems = [
+      { id: 1, phase: 'Assessment', editable: true, subItems: [
+        { id: 11, description: 'Network Equipment and site-site VPN configuration review', resourceClass: 'DIO', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 12, description: 'Perform penetration testing to identify vulnerabilities', resourceClass: 'SE', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 13, description: 'Authentication mechanism review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 14, description: 'Risk assessment with password complexity and MFA review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 15, description: 'Backup solution review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 16, description: 'BCDR plan review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 17, description: 'Document storage review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 18, description: 'Email Collaboration review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 19, description: 'Laptop/Desktop Assessment', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 20, description: 'Network Equipment lifecycle management review', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+      ]},
+      { id: 2, phase: 'Digital Transformation Roadmap', editable: true, subItems: [
+        { id: 31, description: 'SharePoint/OneDrive Migration Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 32, description: 'Office 365 Migration feasibility plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 33, description: 'Endpoint Management and security tools Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 34, description: 'IT Risk Assessment Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 35, description: 'Network Security and Penetration Testing Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 36, description: 'BCDR Documentation', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 37, description: 'Network Equipment lifecycle management/refresh', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+      ]},
+      { id: 3, phase: 'Implementation Phase', editable: true, subItems: [] },
+      { id: 4, phase: 'PM Phase', editable: true, subItems: [
+        { id: 71, description: 'Project Review', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+        { id: 72, description: 'Project Close', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
+      ]},
+    ];
     
     // Main App
     function App() {
@@ -747,35 +826,8 @@
       const [rates, setRates] = useState(initialRates);
       const [expenseConstants, setExpenseConstants] = useState(initialExpenseConstants);
       
-      // Service items
-      const [serviceItems, setServiceItems] = useState([
-        { id: 1, phase: 'Assessment', editable: true, subItems: [
-          { id: 11, description: 'Network Equipment and site-site VPN configuration review', resourceClass: 'DIO', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 12, description: 'Perform penetration testing to identify vulnerabilities', resourceClass: 'SE', hours: 6, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 13, description: 'Authentication mechanism review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 14, description: 'Risk assessment with password complexity and MFA review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 15, description: 'Backup solution review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 16, description: 'BCDR plan review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 17, description: 'Document storage review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 18, description: 'Email Collaboration review', resourceClass: 'DIO', hours: 1, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 19, description: 'Laptop/Desktop Assessment', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 20, description: 'Network Equipment lifecycle management review', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-        ]},
-        { id: 2, phase: 'Digital Transformation Roadmap', editable: true, subItems: [
-          { id: 31, description: 'SharePoint/OneDrive Migration Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 32, description: 'Office 365 Migration feasibility plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 33, description: 'Endpoint Management and security tools Plan', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 34, description: 'IT Risk Assessment Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 35, description: 'Network Security and Penetration Testing Report', resourceClass: 'SE', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 36, description: 'BCDR Documentation', resourceClass: 'DIO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 37, description: 'Network Equipment lifecycle management/refresh', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-        ]},
-        { id: 3, phase: 'Implementation Phase', editable: true, subItems: [] },
-        { id: 4, phase: 'PM Phase', editable: true, subItems: [
-          { id: 71, description: 'Project Review', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-          { id: 72, description: 'Project Close', resourceClass: 'CXO', hours: 2, afterHours: false, maintenanceRequired: false, outageHours: 0 },
-        ]},
-      ]);
+      // Service items (start blank; apply templates from Services tab or Config)
+      const [serviceItems, setServiceItems] = useState([]);
       
       // Products
       const [products, setProducts] = useState([
@@ -814,7 +866,10 @@
         const rate = rates[resourceClass];
         if (!rate) return 0;
         let baseRate = coverData.isMspClient ? rate.mspPrice : rate.nonMspPrice;
-        if (coverData.isMspClient && coverData.mspDiscount > 0) baseRate = baseRate * (1 - coverData.mspDiscount / 100);
+        // Always apply discount when set, regardless of MSP flag
+        if (coverData.mspDiscount > 0) {
+          baseRate = baseRate * (1 - coverData.mspDiscount / 100);
+        }
         return baseRate;
       }, [rates, coverData.isMspClient, coverData.mspDiscount]);
       
@@ -1090,6 +1145,34 @@
       const updateChangeOrder = (id, field, value) => setChangeOrders(prev => prev.map(co => co.id === id ? { ...co, [field]: value } : co));
       const deleteChangeOrder = (id) => setChangeOrders(prev => prev.filter(co => co.id !== id));
       
+      const applyDefaultServicesTemplate = async () => {
+        try {
+          const fromBlob = await loadDefaultServicesTemplateFromBlob();
+          if (fromBlob && Array.isArray(fromBlob.serviceItems) && fromBlob.serviceItems.length) {
+            setServiceItems(fromBlob.serviceItems);
+          } else {
+            setServiceItems(bakedInDefaultServiceItems);
+          }
+        } catch (err) {
+          console.error('❌ Error applying default services template:', err);
+          setServiceItems(bakedInDefaultServiceItems);
+        }
+      };
+
+      const saveDefaultServicesTemplate = async () => {
+        try {
+          if (!serviceItems || serviceItems.length === 0) {
+            const confirmEmpty = window.confirm('You have no service rows defined. Save an empty template anyway?');
+            if (!confirmEmpty) return;
+          }
+          await saveDefaultServicesTemplateToBlob(serviceItems);
+          alert('✅ Saved current services as the default template in Azure Blob Storage.');
+        } catch (err) {
+          console.error('❌ Failed to save default services template:', err);
+          alert('⚠️ Failed to save default template: ' + err.message);
+        }
+      };
+      
       // Excel Export Function
       const exportToExcel = () => {
         const wb = XLSX.utils.book_new();
@@ -1323,7 +1406,24 @@
           <div className={`container ${activeTab === 'services' ? 'active' : ''}`}>
             <div className="header"><span className="robot-icon">⚡</span><h1>Services Estimator</h1><p>Phases, Tasks & Labor Hours</p></div>
             <div className="content-area">
-              <ServicesTab serviceItems={serviceItems} rates={rates} getEffectiveRate={getEffectiveRate} updateServiceItem={updateServiceItem} addServiceItem={addServiceItem} deleteServiceItem={deleteServiceItem} updatePhaseName={updatePhaseName} addPhase={addPhase} deletePhase={deletePhase} totalHours={totalHours} laborRevenue={laborRevenue} avgHourlyCost={avgHourlyCost} avgHourlyRate={avgHourlyRate} phaseTotals={phaseTotals} />
+              <ServicesTab
+                serviceItems={serviceItems}
+                rates={rates}
+                getEffectiveRate={getEffectiveRate}
+                updateServiceItem={updateServiceItem}
+                addServiceItem={addServiceItem}
+                deleteServiceItem={deleteServiceItem}
+                updatePhaseName={updatePhaseName}
+                addPhase={addPhase}
+                deletePhase={deletePhase}
+                totalHours={totalHours}
+                laborRevenue={laborRevenue}
+                avgHourlyCost={avgHourlyCost}
+                avgHourlyRate={avgHourlyRate}
+                phaseTotals={phaseTotals}
+                onApplyDefaultTemplate={applyDefaultServicesTemplate}
+                onSaveDefaultTemplate={saveDefaultServicesTemplate}
+              />
             </div>
           </div>
           
@@ -1476,10 +1576,23 @@
     }
     
     // Services Tab
-    function ServicesTab({ serviceItems, rates, getEffectiveRate, updateServiceItem, addServiceItem, deleteServiceItem, updatePhaseName, addPhase, deletePhase, totalHours, laborRevenue, avgHourlyCost, avgHourlyRate, phaseTotals }) {
+    function ServicesTab({ serviceItems, rates, getEffectiveRate, updateServiceItem, addServiceItem, deleteServiceItem, updatePhaseName, addPhase, deletePhase, totalHours, laborRevenue, avgHourlyCost, avgHourlyRate, phaseTotals, onApplyDefaultTemplate, onSaveDefaultTemplate }) {
       return (
         <div>
           <h2 className="section-title">Services Estimation</h2>
+          <div className="config-section" style={{ marginBottom: 15, padding: 12 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: '#6c757d' }}>
+                Start with a blank canvas or apply your default phase/task template.
+              </span>
+              <button className="btn btn-secondary" type="button" onClick={onApplyDefaultTemplate}>
+                📋 Apply Default Template
+              </button>
+              <button className="btn btn-secondary" type="button" onClick={onSaveDefaultTemplate}>
+                💾 Save Current as Default
+              </button>
+            </div>
+          </div>
           <div className="summary-cards" style={{ marginBottom: 15 }}>
             <div className="summary-card"><div className="summary-card-label">Total Hours</div><div className="summary-card-value">{totalHours}</div></div>
             <div className="summary-card"><div className="summary-card-label">Avg Cost/Hr</div><div className="summary-card-value">{formatCurrency(avgHourlyCost)}</div></div>
