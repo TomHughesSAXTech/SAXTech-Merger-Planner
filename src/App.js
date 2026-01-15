@@ -296,7 +296,7 @@ function App() {
   const generateExecutionPlan = async () => {
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/plan-generate', {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
