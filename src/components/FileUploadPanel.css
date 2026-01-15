@@ -1,0 +1,41 @@
+.file-upload-panel {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e1dfdd;
+}
+
+.file-upload-header {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.file-upload-help {
+  font-size: 0.75rem;
+  color: #605e5c;
+  margin-bottom: 0.5rem;
+}
+
+.file-upload-list {
+  margin-top: 0.5rem;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.file-upload-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.file-upload-item .file-status {
+  text-transform: capitalize;
+}
+
+.file-upload-item.done .file-status {
+  color: #107c10;
+}
+
+.file-upload-item.error .file-status {
+  color: #d13438;
+}

@@ -15,6 +15,7 @@ import { MessageSquare, GitBranch, Download, Play } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import DiscoveryPanel from './components/DiscoveryPanel';
 import NetworkDiagram from './components/NetworkDiagram';
+import FileUploadPanel from './components/FileUploadPanel';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
 
@@ -281,6 +282,13 @@ function App() {
     syncDiscoveryUpdate(category, updatedCategoryData);
   };
 
+  const handleDiscoveryMergeFromFile = (allDiscoveryData) => {
+    setDiscoveryData(allDiscoveryData || {});
+    Object.entries(allDiscoveryData || {}).forEach(([category, data]) => {
+      updateCategoryNode(category, data);
+    });
+  };
+
   const handleCategoryChange = (categoryId) => {
     setCurrentPhase(categoryId);
   };
@@ -429,6 +437,10 @@ function App() {
             currentPhase={currentPhase}
             config={config}
             onEdit={handleDiscoveryEdit}
+          />
+          <FileUploadPanel
+            sessionId={sessionId}
+            onDiscoveryMerge={handleDiscoveryMergeFromFile}
           />
         </div>
 
