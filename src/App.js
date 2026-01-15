@@ -480,18 +480,6 @@ function App() {
         ) : (
           <NetworkDiagram discoveryData={discoveryData} />
         )}
-              nodeColor={(node) => {
-                switch (node.data?.status) {
-                  case 'active': return '#0078D4';
-                  case 'completed': return '#107C10';
-                  case 'pending': return '#FFB900';
-                  case 'risk': return '#D13438';
-                  default: return '#605E5C';
-                }
-              }}
-            />
-          </ReactFlow>
-        </div>
       </div>
 
       {isProcessing && (

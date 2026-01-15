@@ -6,8 +6,9 @@
     "start": "func start"
   },
   "dependencies": {
-    "@azure/openai": "^1.0.0-beta.12",
+    "@azure/ai-form-recognizer": "^5.1.0",
     "@azure/cosmos": "^4.0.0",
+    "@azure/openai": "^1.0.0-beta.12",
     "@azure/storage-blob": "^12.17.0",
     "uuid": "^9.0.0"
   },
