@@ -14,6 +14,7 @@ import dagre from 'dagre';
 import { MessageSquare, GitBranch, Download, Play } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import DiscoveryPanel from './components/DiscoveryPanel';
+import NetworkDiagram from './components/NetworkDiagram';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
 
@@ -64,10 +65,63 @@ function App() {
     window.location.pathname === '/admin.html'
   );
   const [config, setConfig] = useState(null);
+  const [viewMode, setViewMode] = useState('plan'); // 'plan' | 'network'
+
+  const persistSessionId = (id) => {
+    try {
+      if (id) {
+        window.localStorage.setItem('maonboarding-session-id', id);
+        const url = new URL(window.location.href);
+        url.searchParams.set('sessionId', id);
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch (err) {
+      console.error('Failed to persist sessionId:', err);
+    }
+  };
+
+  const resumeSession = async (existingSessionId) => {
+    if (!existingSessionId) return;
+    setSessionId(existingSessionId);
+    persistSessionId(existingSessionId);
+    try {
+      const response = await fetch(`https://maonboarding-functions.azurewebsites.net/api/session-get?sessionId=${encodeURIComponent(existingSessionId)}`);
+      if (!response.ok) {
+        console.error('Failed to resume session: HTTP', response.status);
+        return;
+      }
+      const data = await response.json().catch((err) => {
+        console.error('Failed to parse session-get response:', err);
+        return null;
+      });
+      if (!data) return;
+
+      const loadedDiscovery = data.discoveryData || {};
+      setDiscoveryData(loadedDiscovery);
+      Object.entries(loadedDiscovery).forEach(([category, categoryData]) => {
+        updateCategoryNode(category, categoryData);
+      });
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+    }
+  };
 
   useEffect(() => {
-    // Initialize session
-    initializeSession();
+    // Attempt resume from URL or localStorage; otherwise create new session
+    const url = new URL(window.location.href);
+    let existingId = url.searchParams.get('sessionId');
+    if (!existingId) {
+      try {
+        existingId = window.localStorage.getItem('maonboarding-session-id');
+      } catch {}
+    }
+
+    if (existingId) {
+      resumeSession(existingId);
+    } else {
+      initializeSession();
+    }
+
     // Load configuration
     loadConfig();
   }, []);
@@ -111,6 +165,7 @@ function App() {
       }
       console.log('[DEBUG] Session initialized:', data.sessionId);
       setSessionId(data.sessionId);
+      persistSessionId(data.sessionId);
       
       // Set initial root node
       const initialNodes = [{
@@ -325,6 +380,18 @@ function App() {
         <h1><GitBranch className="inline" /> M&A IT Onboarding Intelligence</h1>
         <div className="header-actions">
           <button 
+            onClick={() => setViewMode('plan')}
+            className={`btn btn-secondary ${viewMode === 'plan' ? 'active' : ''}`}
+          >
+            Plan View
+          </button>
+          <button
+            onClick={() => setViewMode('network')}
+            className={`btn btn-secondary ${viewMode === 'network' ? 'active' : ''}`}
+          >
+            Network View
+          </button>
+          <button 
             onClick={generateExecutionPlan} 
             disabled={isProcessing || currentPhase === 'discovery'}
             className="btn btn-primary"
@@ -365,26 +432,42 @@ function App() {
           />
         </div>
 
-        <div className="tree-container">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => {
-              if (node.id.endsWith('-node')) {
-                const categoryId = node.id.replace('-node', '');
-                setCurrentPhase(categoryId);
-              }
-            }}
-            nodeTypes={nodeTypes}
-            fitView
-            attributionPosition="bottom-left"
-          >
-            <Background color="#aaa" gap={16} />
-            <Controls />
-            <MiniMap 
+        {viewMode === 'plan' ? (
+          <div className="tree-container">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={(_, node) => {
+                if (node.id.endsWith('-node')) {
+                  const categoryId = node.id.replace('-node', '');
+                  setCurrentPhase(categoryId);
+                }
+              }}
+              nodeTypes={nodeTypes}
+              fitView
+              attributionPosition="bottom-left"
+            >
+              <Background color="#aaa" gap={16} />
+              <Controls />
+              <MiniMap 
+                nodeColor={(node) => {
+                  switch (node.data?.status) {
+                    case 'active': return '#0078D4';
+                    case 'completed': return '#107C10';
+                    case 'pending': return '#FFB900';
+                    case 'risk': return '#D13438';
+                    default: return '#605E5C';
+                  }
+                }}
+              />
+            </ReactFlow>
+          </div>
+        ) : (
+          <NetworkDiagram discoveryData={discoveryData} />
+        )}
               nodeColor={(node) => {
                 switch (node.data?.status) {
                   case 'active': return '#0078D4';
