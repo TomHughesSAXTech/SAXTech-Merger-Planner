@@ -88,6 +88,45 @@ module.exports = async function (context, req) {
     const executionPlan = session.executionPlan;
     const discoveryData = session.discoveryData || {};
 
+    // Reference template: baseline hours and phase structure for a
+    // small-firm, two-server, five-user migration. This is used to
+    // calibrate GPT's estimates so they stay in a realistic range.
+    const baselineHoursTemplate = `
+PROJECT TYPE EXAMPLE (REFERENCE ONLY)
+- Scenario: 2 servers, ~5 users, single main office plus small satellite.
+- High-level phases and typical effort:
+  - Phase 0: Pre-Migration & Discovery .......... ~12 hours
+  - Phase 1: Server Migration (Deliverable 1) ... ~42 hours
+  - Phase 2: User Onboarding (5 users) .......... ~22.5 hours
+  - Phase 3: Data Migration/Lockdown/Backup ..... ~18 hours
+  - Phase 4: Email/OneDrive/Website/DNS Cutover . ~27.5 hours
+  - Phase 5: Post-Migration & Stabilization ..... ~29.5 hours
+  - Total baseline effort ........................ ~150–155 hours
+
+HOURS BY DELIVERABLE (REFERENCE)
+- Deliverable 1 – Two Server Migration
+  - Includes Datto prep, VHD export/import, Azure VM build, security stack,
+    permissions, backup cutover, and server validation.
+  - Typical: ~56 hours total.
+- Deliverable 2 – User Onboarding (5 users / 5 laptops)
+  - Includes AD/M365 accounts, imaging, deployment, profile config,
+    and user orientation.
+  - Typical: ~27.5 hours total.
+- Deliverable 3 – Data Migration/Lockdown/Backup
+  - Includes S: drive validation, workstation data sweep, retention model,
+    backup validation, and legacy backup decommission.
+  - Typical: ~21 hours total.
+- Deliverable 4 – Email/OneDrive/Website/DNS Cutover
+  - Includes domain transfer, DNS/Proofpoint, BitTitan migrations,
+    OneDrive moves, and mail-flow testing.
+  - Typical: ~31.5 hours total.
+
+These numbers are not hard constraints, but for a similarly sized
+environment (2 servers, ~5 users) the total project estimate should
+usually stay within ~135–170 hours unless discovery clearly indicates
+substantially more or less work (larger data sets, many more users,
+complex VPN/site topology, heavy application remediation, etc.).`;
+
     // Helper: try to infer a customer/company name from discovery data
     function inferCustomerFromDiscovery(dd) {
       try {
@@ -122,6 +161,16 @@ module.exports = async function (context, req) {
 
     const transformPrompt = `You are helping map an M&A IT onboarding execution plan into a structured
 SAX SOW builder schema used for estimating hours.
+
+Use the following reference project as a calibration example for
+phase structure and realistic hours for a two-server, five-user
+migration. Do not copy client names, but mirror the level of detail
+and approximate effort when the discovered environment is of similar
+size:
+
+${baselineHoursTemplate}
+
+Now analyze the actual engagement details below.
 
 Input discovery data (JSON):\n${JSON.stringify(discoveryData, null, 2)}
 
@@ -161,9 +210,12 @@ Target output JSON schema (no comments):
 
 Rules:
 - Derive phases from the execution plan phases.
-- Derive tasks from phase tasks, grouping into subItems with reasonable hour estimates.
-- Choose resourceClass based on the type of work: CXO for high-level/PM, DIO for architecture/design,
-  SE for technical implementation.
+- Derive tasks from phase tasks, grouping into subItems with realistic hour
+  estimates roughly in line with the reference project when the environment
+  is similar in size (2 servers, ~5 users). Scale hours up or down when
+  discovery clearly indicates more or fewer users, servers, or complexity.
+- Choose resourceClass based on the type of work: CXO for high-level/PM,
+  DIO for architecture/design, SE for technical implementation.
 - Keep JSON compact but valid. Return ONLY JSON.`;
 
     let sow;
