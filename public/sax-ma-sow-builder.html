@@ -1577,6 +1577,8 @@
     
     // Services Tab
     function ServicesTab({ serviceItems, rates, getEffectiveRate, updateServiceItem, addServiceItem, deleteServiceItem, updatePhaseName, addPhase, deletePhase, totalHours, laborRevenue, avgHourlyCost, avgHourlyRate, phaseTotals, onApplyDefaultTemplate, onSaveDefaultTemplate }) {
+      const [expandedTasks, setExpandedTasks] = useState({});
+      const toggleExpanded = (id) => setExpandedTasks(prev => ({ ...prev, [id]: !prev[id] }));
       return (
         <div>
           <h2 className="section-title">Services Estimation</h2>
@@ -1628,20 +1630,83 @@
                         {phaseRiskLabel && <span style={{ marginLeft: 12, fontSize: '0.8rem', color: '#c0392b' }}>{phaseRiskLabel}</span>}
                       </td>
                     </tr>
+                    {serviceItems.mapPhaseSubItemsWithDetails
+                    ? null
+                    : null}
                     {phase.subItems.map(item => {
                       const rate = getEffectiveRate(item.resourceClass);
+                      const itemId = item.id;
                       return (
-                        <tr key={item.id}>
-                          <td><button className="btn-danger" onClick={() => deleteServiceItem(phase.id, item.id)}>✕</button></td>
-                          <td><input type="text" className="inline-edit" value={item.description} onChange={(e) => updateServiceItem(phase.id, item.id, 'description', e.target.value)} /></td>
-                          <td><select value={item.resourceClass} onChange={(e) => updateServiceItem(phase.id, item.id, 'resourceClass', e.target.value)} style={{ width: '100%' }}><option value="">—</option>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
-                          <td className="number"><input type="number" min="0" step="0.5" value={item.hours} onChange={(e) => updateServiceItem(phase.id, item.id, 'hours', parseFloat(e.target.value) || 0)} style={{ width: 50 }} /></td>
-                          <td className="currency">{formatCurrency(rate)}</td>
-                          <td className="currency">{formatCurrency(item.hours * rate)}</td>
-                          <td className="number"><input type="checkbox" checked={item.afterHours || false} onChange={(e) => updateServiceItem(phase.id, item.id, 'afterHours', e.target.checked)} /></td>
-                          <td className="number"><input type="checkbox" checked={item.maintenanceRequired || false} onChange={(e) => updateServiceItem(phase.id, item.id, 'maintenanceRequired', e.target.checked)} /></td>
-                          <td><input type="number" min="0" step="0.5" value={item.outageHours || 0} onChange={(e) => updateServiceItem(phase.id, item.id, 'outageHours', parseFloat(e.target.value) || 0)} style={{ width: 45 }} disabled={!item.maintenanceRequired} /></td>
-                        </tr>
+                        <React.Fragment key={itemId}>
+                          <tr>
+                            <td><button className="btn-danger" onClick={() => deleteServiceItem(phase.id, itemId)}>✕</button></td>
+                            <td>
+                              <input
+                                type="text"
+                                className="inline-edit"
+                                value={item.description}
+                                onChange={(e) => updateServiceItem(phase.id, itemId, 'description', e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{ marginTop: 4, padding: '2px 8px', fontSize: '0.7rem' }}
+                                onClick={() => toggleExpanded(itemId)}
+                              >
+                                {expandedTasks[itemId] ? 'Hide Steps' : 'Steps'}
+                              </button>
+                            </td>
+                            <td>
+                              <select
+                                value={item.resourceClass}
+                                onChange={(e) => updateServiceItem(phase.id, itemId, 'resourceClass', e.target.value)}
+                                style={{ width: '100%' }}
+                              >
+                                <option value="">—</option>
+                                {Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}
+                              </select>
+                            </td>
+                            <td className="number">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={item.hours}
+                                onChange={(e) => updateServiceItem(phase.id, itemId, 'hours', parseFloat(e.target.value) || 0)}
+                                style={{ width: 50 }}
+                              />
+                            </td>
+                            <td className="currency">{formatCurrency(rate)}</td>
+                            <td className="currency">{formatCurrency(item.hours * rate)}</td>
+                            <td className="number"><input type="checkbox" checked={item.afterHours || false} onChange={(e) => updateServiceItem(phase.id, itemId, 'afterHours', e.target.checked)} /></td>
+                            <td className="number"><input type="checkbox" checked={item.maintenanceRequired || false} onChange={(e) => updateServiceItem(phase.id, itemId, 'maintenanceRequired', e.target.checked)} /></td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={item.outageHours || 0}
+                                onChange={(e) => updateServiceItem(phase.id, itemId, 'outageHours', parseFloat(e.target.value) || 0)}
+                                style={{ width: 45 }}
+                                disabled={!item.maintenanceRequired}
+                              />
+                            </td>
+                          </tr>
+                          {expandedTasks[itemId] && (
+                            <tr>
+                              <td></td>
+                              <td colSpan={8}>
+                                <textarea
+                                  rows={3}
+                                  className="inline-edit"
+                                  placeholder="Internal-only steps / justification for hours. Not shown on client SOW."
+                                  value={item.detailSteps || ''}
+                                  onChange={(e) => updateServiceItem(phase.id, itemId, 'detailSteps', e.target.value)}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                     <tr className="totals-row"><td></td><td colSpan={2} style={{ textAlign: 'right' }}>Phase Total:</td><td className="number">{pt.hours}</td><td></td><td className="currency">{formatCurrency(pt.cost)}</td><td colSpan={3}></td></tr>
@@ -1685,7 +1750,7 @@
                     <td className="currency">{formatCurrency(sell)}</td>
                     <td className="number"><input type="checkbox" checked={p.vendorInstall} onChange={(e) => { updateProduct(p.id, 'vendorInstall', e.target.checked); if (e.target.checked) updateProduct(p.id, 'saxInstall', false); }} /></td>
                     <td className="number"><input type="checkbox" checked={p.saxInstall} onChange={(e) => { updateProduct(p.id, 'saxInstall', e.target.checked); if (e.target.checked) updateProduct(p.id, 'vendorInstall', false); }} /></td>
-                    <td><input type="number" min="0" step="0.5" value={p.installHours} onChange={(e) => updateProduct(p.id, 'installHours', parseFloat(e.target.value) || 0)} disabled={!p.saxInstall} style={{ width: 45 }} /></td>
+                    <td><input type="number" min="0" step="0.1" value={p.installHours} onChange={(e) => updateProduct(p.id, 'installHours', parseFloat(e.target.value) || 0)} disabled={!p.saxInstall} style={{ width: 45 }} /></td>
                     <td><select value={p.installResource} onChange={(e) => updateProduct(p.id, 'installResource', e.target.value)} disabled={!p.saxInstall}>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
                     <td className="currency">{formatCurrency(inst)}</td>
                   </tr>
@@ -1722,7 +1787,7 @@
                       <td><input type="number" min="0" value={e.trips} onChange={(x) => update(k, 'trips', x.target.value)} style={{ width: 40 }} /></td>
                       <td><input type="number" min="0" value={e.mileage} onChange={(x) => update(k, 'mileage', x.target.value)} style={{ width: 50 }} /></td>
                       <td className="currency">{formatCurrency(mExp)}</td>
-                      <td><input type="number" min="0" value={e.travelHours} onChange={(x) => update(k, 'travelHours', x.target.value)} style={{ width: 40 }} /></td>
+                      <td><input type="number" min="0" step="0.1" value={e.travelHours} onChange={(x) => update(k, 'travelHours', x.target.value)} style={{ width: 40 }} /></td>
                       <td className="currency">{formatCurrency(tExp)}</td>
                       <td><input type="number" min="0" value={e.expenseDays} onChange={(x) => update(k, 'expenseDays', x.target.value)} style={{ width: 40 }} /></td>
                       <td className="currency">{formatCurrency(meals)}</td>
@@ -1834,27 +1899,64 @@
       const stopDraw = () => { setDrawing(false); setSaxSignatureData(canvasRef.current.toDataURL()); };
       const clearSig = () => { const c = canvasRef.current; const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); setSaxSignatureData(null); };
       const updateRate = (k, f, v) => setRates(prev => ({ ...prev, [k]: { ...prev[k], [f]: typeof v === 'string' ? v : (parseFloat(v) || 0) } }));
+
+      const targetMargin = coverData.targetGM || 0;
+      const showSuggestions = targetMargin > 0 && targetMargin < 99;
+
+      const getTargetRateForMargin = (burdenedCost) => {
+        if (!showSuggestions) return null;
+        const m = targetMargin / 100;
+        if (m >= 1) return null;
+        return burdenedCost / (1 - m);
+      };
+
       return (
         <div>
           <h2 className="section-title">Configuration</h2>
           <div className="config-section">
             <h3>Rate Structure</h3>
+            <p style={{ color: '#6c757d', marginBottom: 8, fontSize: '0.85rem' }}>
+              Current target GM: <strong>{targetMargin.toFixed(1)}%</strong>. Suggested bill rates below are what you
+              would need (per class) to hit that margin on labor, based on the fully burdened cost.
+            </p>
             <div style={{ overflowX: 'auto' }}>
               <table>
-                <thead><tr><th>Class</th><th>Title</th><th>Type</th><th>Base$</th><th>Burden%</th><th>MSP$</th><th>Non-MSP$</th><th>AH%</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Base$</th>
+                    <th>Burden%</th>
+                    <th>MSP$</th>
+                    <th>Non-MSP$</th>
+                    <th>AH%</th>
+                    <th>Suggested @ Target GM</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {Object.keys(rates).map(k => (
-                    <tr key={k}>
-                      <td><strong>{k}</strong></td>
-                      <td><input type="text" value={rates[k].title} onChange={(e) => updateRate(k, 'title', e.target.value)} style={{ width: 150 }} /></td>
-                      <td><select value={rates[k].serviceType} onChange={(e) => updateRate(k, 'serviceType', e.target.value)}>{SERVICE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
-                      <td><input type="number" min="0" step="0.01" value={rates[k].baseCost} onChange={(e) => updateRate(k, 'baseCost', e.target.value)} style={{ width: 70 }} /></td>
-                      <td><input type="number" min="0" value={rates[k].burdenPercent} onChange={(e) => updateRate(k, 'burdenPercent', e.target.value)} style={{ width: 50 }} /></td>
-                      <td><input type="number" min="0" value={rates[k].mspPrice} onChange={(e) => updateRate(k, 'mspPrice', e.target.value)} style={{ width: 70 }} /></td>
-                      <td><input type="number" min="0" value={rates[k].nonMspPrice} onChange={(e) => updateRate(k, 'nonMspPrice', e.target.value)} style={{ width: 70 }} /></td>
-                      <td><input type="number" min="0" value={rates[k].afterHoursPercent} onChange={(e) => updateRate(k, 'afterHoursPercent', e.target.value)} style={{ width: 50 }} /></td>
-                    </tr>
-                  ))}
+                  {Object.keys(rates).map(k => {
+                    const r = rates[k];
+                    const burdened = getFullyBurdenedCost(r);
+                    const suggested = getTargetRateForMargin(burdened);
+                    return (
+                      <tr key={k}>
+                        <td><strong>{k}</strong></td>
+                        <td><input type="text" value={r.title} onChange={(e) => updateRate(k, 'title', e.target.value)} style={{ width: 150 }} /></td>
+                        <td><select value={r.serviceType} onChange={(e) => updateRate(k, 'serviceType', e.target.value)}>{SERVICE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
+                        <td><input type="number" min="0" step="0.01" value={r.baseCost} onChange={(e) => updateRate(k, 'baseCost', e.target.value)} style={{ width: 70 }} /></td>
+                        <td><input type="number" min="0" value={r.burdenPercent} onChange={(e) => updateRate(k, 'burdenPercent', e.target.value)} style={{ width: 50 }} /></td>
+                        <td><input type="number" min="0" value={r.mspPrice} onChange={(e) => updateRate(k, 'mspPrice', e.target.value)} style={{ width: 70 }} /></td>
+                        <td><input type="number" min="0" value={r.nonMspPrice} onChange={(e) => updateRate(k, 'nonMspPrice', e.target.value)} style={{ width: 70 }} /></td>
+                        <td><input type="number" min="0" value={r.afterHoursPercent} onChange={(e) => updateRate(k, 'afterHoursPercent', e.target.value)} style={{ width: 50 }} /></td>
+                        <td style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                          {showSuggestions && suggested
+                            ? <span>{formatCurrency(suggested)} / hr @ {targetMargin.toFixed(1)}% GM</span>
+                            : <span style={{ opacity: 0.7 }}>Set a Target GM% on the Cover tab to see suggestions</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2148,7 +2250,7 @@
                         <td><button className="btn-danger" onClick={() => deleteItem(co.id, i.id)}>✕</button></td>
                         <td><input type="text" className="inline-edit" value={i.description} onChange={(e) => updateItem(co.id, i.id, 'description', e.target.value)} placeholder="Task..." /></td>
                         <td><select value={i.resourceClass} onChange={(e) => updateItem(co.id, i.id, 'resourceClass', e.target.value)}>{Object.keys(rates).map(k => <option key={k} value={k}>{k}</option>)}</select></td>
-                        <td><input type="number" min="0" step="0.5" value={i.hours} onChange={(e) => updateItem(co.id, i.id, 'hours', parseFloat(e.target.value) || 0)} style={{ width: 60 }} /></td>
+                      <td><input type="number" min="0" step="0.1" value={i.hours} onChange={(e) => updateItem(co.id, i.id, 'hours', parseFloat(e.target.value) || 0)} style={{ width: 60 }} /></td>
                         <td className="currency">{formatCurrency(getEffectiveRate(i.resourceClass))}</td>
                         <td className="currency">{formatCurrency((parseFloat(i.hours) || 0) * getEffectiveRate(i.resourceClass))}</td>
                       </tr>
