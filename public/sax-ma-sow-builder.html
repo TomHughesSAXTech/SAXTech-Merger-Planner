@@ -1697,11 +1697,16 @@
                               <td></td>
                               <td colSpan={8}>
                                 <textarea
-                                  rows={3}
+                                  rows={1}
                                   className="inline-edit"
                                   placeholder="Internal-only steps / justification for hours. Not shown on client SOW."
                                   value={item.detailSteps || ''}
                                   onChange={(e) => updateServiceItem(phase.id, itemId, 'detailSteps', e.target.value)}
+                                  onInput={(e) => {
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = `${e.target.scrollHeight}px`;
+                                  }}
+                                  style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
                                 />
                               </td>
                             </tr>
