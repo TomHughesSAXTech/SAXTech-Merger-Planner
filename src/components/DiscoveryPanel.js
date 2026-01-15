@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import './DiscoveryPanel.css';
 
@@ -6,6 +6,7 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
   const [expandedSections, setExpandedSections] = useState({});
   const [editing, setEditing] = useState(null); // { categoryId, key }
   const [editValue, setEditValue] = useState('');
+  const sectionsRef = useRef(null);
 
   // Prefer dynamic categories from config so this panel reflects the actual
   // discovery sections defined in the admin UI (e.g., general, server, workstation,
@@ -126,6 +127,12 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
     return (completedCategories / categories.length) * 100;
   };
 
+  useEffect(() => {
+    if (sectionsRef.current) {
+      sectionsRef.current.scrollTop = sectionsRef.current.scrollHeight;
+    }
+  }, [discoveryData]);
+
   return (
     <div className="discovery-panel">
       <div className="panel-header">
@@ -139,7 +146,7 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
         <span className="progress-text">{Math.round(calculateProgress())}% Complete</span>
       </div>
 
-      <div className="discovery-sections">
+      <div className="discovery-sections" ref={sectionsRef}>
         {categories.map(category => (
           <div key={category.id} className="discovery-section">
             <div 

@@ -172,9 +172,16 @@ module.exports = async function (context, req) {
             const hasRequiredFields = completionCriteria.requiredFields?.every(field => 
                 session.discoveryData[category]?.[field]
             ) ?? true;
+            const minFacts = completionCriteria.minFacts ?? 3;
 
-            // Require BOTH: enough extracted facts AND an explicit user signal to move on.
-            if (userSignaledDone && factCount >= (completionCriteria.minFacts || 3) && hasRequiredFields) {
+            // Require an explicit user signal AND either:
+            // - enough extracted facts per config, OR
+            // - zero facts but no required fields (e.g., sections where "none" is a valid answer).
+            if (
+                userSignaledDone &&
+                hasRequiredFields &&
+                (factCount >= minFacts || (factCount === 0 && (!completionCriteria.requiredFields || completionCriteria.requiredFields.length === 0)))
+            ) {
                 categoryComplete = true;
             }
         } else {

@@ -55,15 +55,29 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
     const loadConfig = async () => {
       try {
         const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data);
-          // Set initial category from config or fallback to infrastructure
-          if (data?.config?.categories?.length > 0) {
-            setCurrentCategory(data.config.categories[0].id);
-          } else if (!currentCategory) {
+        if (!response.ok) {
+          console.error('ChatInterface config-get failed: HTTP', response.status);
+          if (!currentCategory) {
             setCurrentCategory('infrastructure');
           }
+          return;
+        }
+        const data = await response.json().catch((err) => {
+          console.error('ChatInterface failed to parse config-get response:', err);
+          return null;
+        });
+        if (!data) {
+          if (!currentCategory) {
+            setCurrentCategory('infrastructure');
+          }
+          return;
+        }
+        setConfig(data);
+        // Set initial category from config or fallback to infrastructure
+        if (data?.config?.categories?.length > 0) {
+          setCurrentCategory(data.config.categories[0].id);
+        } else if (!currentCategory) {
+          setCurrentCategory('infrastructure');
         }
       } catch (error) {
         console.error('Failed to load config, using defaults:', error);
