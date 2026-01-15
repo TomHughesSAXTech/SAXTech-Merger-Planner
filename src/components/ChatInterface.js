@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
 import './ChatInterface.css';
 
-const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
+const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryChange }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -74,6 +74,12 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase }) => {
     };
     loadConfig();
   }, []);
+
+  useEffect(() => {
+    if (currentCategory && onCategoryChange) {
+      onCategoryChange(currentCategory);
+    }
+  }, [currentCategory, onCategoryChange]);
 
   useEffect(() => {
     // Initialize with welcome message

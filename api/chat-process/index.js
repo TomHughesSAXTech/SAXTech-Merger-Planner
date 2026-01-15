@@ -76,9 +76,12 @@ module.exports = async function (context, req) {
 
         const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
         
-        // Get category prompts from config or use defaults
+        // Get category prompts from config or use defaults, but constrain behavior so the
+        // model does NOT ask its own follow-up questions. The UI controls the questions;
+        // the model should only acknowledge and extract facts.
         const categoryConfig = config?.categories?.find(c => c.id === category);
-        const systemPrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
+        const basePrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
+        const systemPrompt = `${basePrompt}\n\nCRITICAL BEHAVIOR RULES:\n- Do NOT ask the user any questions.\n- Do NOT propose next topics or sections.\n- ONLY respond with a brief 1-2 sentence acknowledgement or summary of what they just told you.\n- Assume the UI will handle asking all discovery questions. Your primary job is to internally extract structured facts, not to drive the interview.`;
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
 

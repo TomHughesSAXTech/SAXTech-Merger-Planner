@@ -56,7 +56,7 @@ function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [discoveryData, setDiscoveryData] = useState({});
-  const [currentPhase, setCurrentPhase] = useState('infrastructure');
+  const [currentPhase, setCurrentPhase] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAdmin, setShowAdmin] = useState(
@@ -151,6 +151,10 @@ function App() {
       setNodes(layouted.nodes);
       setEdges(layouted.edges);
     }
+  };
+
+  const handleCategoryChange = (categoryId) => {
+    setCurrentPhase(categoryId);
   };
 
   const generateExecutionPlan = async () => {
@@ -278,10 +282,12 @@ function App() {
             sessionId={sessionId}
             onDiscoveryUpdate={handleDiscoveryResponse}
             currentPhase={currentPhase}
+            onCategoryChange={handleCategoryChange}
           />
           <DiscoveryPanel 
             discoveryData={discoveryData}
             currentPhase={currentPhase}
+            config={config}
           />
         </div>
 

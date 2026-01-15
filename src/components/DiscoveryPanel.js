@@ -2,16 +2,27 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import './DiscoveryPanel.css';
 
-const DiscoveryPanel = ({ discoveryData, currentPhase }) => {
+const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
   const [expandedSections, setExpandedSections] = useState({});
 
-  const categories = [
+  // Prefer dynamic categories from config so this panel reflects the actual
+  // discovery sections defined in the admin UI (e.g., general, server, workstation,
+  // etc.). Fall back to the original static categories if config is missing.
+  const configuredCategories = config?.config?.categories?.map((c) => ({
+    id: c.id,
+    label: c.name || c.id.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    icon: '•',
+  })) || [];
+
+  const fallbackCategories = [
     { id: 'infrastructure', label: 'Infrastructure', icon: '🖥️' },
     { id: 'application', label: 'Applications', icon: '📱' },
     { id: 'data', label: 'Data Systems', icon: '💾' },
     { id: 'security', label: 'Security', icon: '🔒' },
-    { id: 'communication', label: 'Communications', icon: '📞' }
+    { id: 'communication', label: 'Communications', icon: '📞' },
   ];
+
+  const categories = configuredCategories.length > 0 ? configuredCategories : fallbackCategories;
 
   const getStatusIcon = (category) => {
     if (discoveryData[category] && Object.keys(discoveryData[category]).length > 0) {
@@ -66,8 +77,10 @@ const DiscoveryPanel = ({ discoveryData, currentPhase }) => {
   };
 
   const calculateProgress = () => {
+    if (!categories.length) return 0;
+
     const completedCategories = categories.filter(
-      cat => discoveryData[cat.id] && Object.keys(discoveryData[cat.id]).length > 0
+      (cat) => discoveryData[cat.id] && Object.keys(discoveryData[cat.id]).length > 0
     ).length;
     return (completedCategories / categories.length) * 100;
   };
