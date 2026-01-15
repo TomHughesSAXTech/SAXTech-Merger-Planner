@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import './DiscoveryPanel.css';
 
-const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
+const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
   const [expandedSections, setExpandedSections] = useState({});
+  const [editing, setEditing] = useState(null); // { categoryId, key }
+  const [editValue, setEditValue] = useState('');
 
   // Prefer dynamic categories from config so this panel reflects the actual
   // discovery sections defined in the admin UI (e.g., general, server, workstation,
@@ -41,9 +43,26 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
     }));
   };
 
-  const formatDiscoveryItem = (key, value) => {
+  const startEditing = (categoryId, key, value) => {
+    setEditing({ categoryId, key });
+    setEditValue(value != null ? String(value) : '');
+  };
+
+  const cancelEditing = () => {
+    setEditing(null);
+    setEditValue('');
+  };
+
+  const saveEditing = () => {
+    if (editing && onEdit) {
+      onEdit(editing.categoryId, editing.key, editValue);
+    }
+    cancelEditing();
+  };
+
+  const formatDiscoveryItem = (categoryId, key, value) => {
     // Format the key to be more readable
-    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     
     // Handle different value types
     if (typeof value === 'object' && !Array.isArray(value)) {
@@ -51,7 +70,7 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
         <div key={key} className="discovery-item nested">
           <div className="item-key">{formattedKey}:</div>
           <div className="nested-items">
-            {Object.entries(value).map(([k, v]) => formatDiscoveryItem(k, v))}
+            {Object.entries(value).map(([k, v]) => formatDiscoveryItem(categoryId, k, v))}
           </div>
         </div>
       );
@@ -67,10 +86,32 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
         </div>
       );
     } else {
+      const isEditing =
+        editing && editing.categoryId === categoryId && editing.key === key;
+
       return (
         <div key={key} className="discovery-item">
           <span className="item-key">{formattedKey}:</span>
-          <span className="item-value">{value}</span>
+          {isEditing ? (
+            <input
+              className="item-input"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={saveEditing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveEditing();
+                if (e.key === 'Escape') cancelEditing();
+              }}
+              autoFocus
+            />
+          ) : (
+            <span
+              className="item-value editable"
+              onClick={() => startEditing(categoryId, key, value)}
+            >
+              {value}
+            </span>
+          )}
         </div>
       );
     }
@@ -123,7 +164,7 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config }) => {
                 {discoveryData[category.id] ? (
                   <div className="discovery-items">
                     {Object.entries(discoveryData[category.id]).map(([key, value]) => 
-                      formatDiscoveryItem(key, value)
+                      formatDiscoveryItem(category.id, key, value)
                     )}
                   </div>
                 ) : (

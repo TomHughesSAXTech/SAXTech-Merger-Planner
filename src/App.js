@@ -118,39 +118,83 @@ function App() {
     }
   };
 
+  const updateCategoryNode = (category, data) => {
+    if (!data || Object.keys(data).length === 0) return;
+
+    const entries = Object.entries(data || {});
+    const summaryParts = entries.slice(0, 3).map(([key, value]) => {
+      const formattedKey = key.replace(/_/g, ' ');
+      const stringValue = Array.isArray(value)
+        ? value.join(', ')
+        : typeof value === 'object'
+          ? '[object]'
+          : String(value);
+      return `${formattedKey}: ${stringValue}`;
+    });
+    const summary = summaryParts.join(' • ');
+
+    const newNode = {
+      id: `${category}-node`,
+      type: 'custom',
+      data: {
+        label: category.charAt(0).toUpperCase() + category.slice(1),
+        status: 'completed',
+        description: summary || `${Object.keys(data).length} items discovered`,
+        raw: data,
+      },
+      position: { x: 0, y: 0 },
+    };
+
+    const newEdge = {
+      id: `root-${category}`,
+      source: 'root',
+      target: `${category}-node`,
+      animated: true,
+    };
+
+    const updatedNodes = [...nodes.filter((n) => n.id !== newNode.id), newNode];
+    const updatedEdges = [...edges.filter((e) => e.id !== newEdge.id), newEdge];
+
+    const layouted = getLayoutedElements(updatedNodes, updatedEdges);
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  };
+
   const handleDiscoveryResponse = (category, data) => {
     // Update discovery data when chat extracts info
     if (data && Object.keys(data).length > 0) {
-      setDiscoveryData(prev => ({
+      setDiscoveryData((prev) => ({
         ...prev,
-        [category]: data
+        [category]: data,
       }));
-      
-      // Add node to the tree for this category
-      const newNode = {
-        id: `${category}-node`,
-        data: { 
-          label: category.charAt(0).toUpperCase() + category.slice(1),
-          status: 'completed',
-          description: `${Object.keys(data).length} items discovered`
-        },
-        position: { x: 0, y: 0 }
-      };
-      
-      const newEdge = {
-        id: `root-${category}`,
-        source: 'root',
-        target: `${category}-node`,
-        animated: true
-      };
-      
-      const updatedNodes = [...nodes.filter(n => n.id !== newNode.id), newNode];
-      const updatedEdges = [...edges.filter(e => e.id !== newEdge.id), newEdge];
-      
-      const layouted = getLayoutedElements(updatedNodes, updatedEdges);
-      setNodes(layouted.nodes);
-      setEdges(layouted.edges);
+      updateCategoryNode(category, data);
     }
+  };
+
+  const syncDiscoveryUpdate = async (category, data) => {
+    if (!sessionId) return;
+    try {
+      await fetch('https://maonboarding-functions.azurewebsites.net/api/discovery-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, category, data }),
+      });
+    } catch (error) {
+      console.error('Failed to sync discovery update:', error);
+    }
+  };
+
+  const handleDiscoveryEdit = (category, key, value) => {
+    const previousCategoryData = discoveryData[category] || {};
+    const updatedCategoryData = { ...previousCategoryData, [key]: value };
+
+    setDiscoveryData((prev) => ({
+      ...prev,
+      [category]: updatedCategoryData,
+    }));
+
+    updateCategoryNode(category, updatedCategoryData);
+    syncDiscoveryUpdate(category, updatedCategoryData);
   };
 
   const handleCategoryChange = (categoryId) => {
@@ -288,6 +332,7 @@ function App() {
             discoveryData={discoveryData}
             currentPhase={currentPhase}
             config={config}
+            onEdit={handleDiscoveryEdit}
           />
         </div>
 
@@ -298,6 +343,12 @@ function App() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={(_, node) => {
+              if (node.id.endsWith('-node')) {
+                const categoryId = node.id.replace('-node', '');
+                setCurrentPhase(categoryId);
+              }
+            }}
             nodeTypes={nodeTypes}
             fitView
             attributionPosition="bottom-left"

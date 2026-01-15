@@ -110,16 +110,17 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
     setMessages(prev => [...prev, message]);
   };
 
-  const askNextQuestion = () => {
-    if (!currentCategory) return;
+  const askNextQuestion = (categoryOverride) => {
+    const categoryId = categoryOverride || currentCategory;
+    if (!categoryId) return;
     
     // Get questions from config or use defaults
-    const categoryConfig = config?.config?.categories?.find(c => c.id === currentCategory);
-    const questions = categoryConfig?.questions || defaultDiscoveryQuestions[currentCategory] || [];
+    const categoryConfig = config?.config?.categories?.find(c => c.id === categoryId);
+    const questions = categoryConfig?.questions || defaultDiscoveryQuestions[categoryId] || [];
     
     if (questions && questions.length > 0) {
       // Find next unasked question
-      const categoryKey = currentCategory;
+      const categoryKey = categoryId;
       const alreadyAsked = askedQuestions.filter(q => q.category === categoryKey).length;
       
       if (alreadyAsked < questions.length) {
@@ -128,15 +129,15 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
         addMessage({
           role: 'assistant',
           content: nextQuestion,
-          category: currentCategory,
+          category: categoryId,
           timestamp: new Date().toISOString()
         });
       } else {
         // All questions asked, prompt for completion or next topic
         addMessage({
           role: 'assistant',
-          content: `We've covered all the ${categoryConfig?.name || currentCategory} questions. Is there anything else you'd like to add, or should we move on? (Type 'next' to continue)`,
-          category: currentCategory,
+          content: `We've covered all the ${categoryConfig?.name || categoryId} questions. Is there anything else you'd like to add, or should we move on? (Type 'next' to continue)`,
+          category: categoryId,
           timestamp: new Date().toISOString()
         });
       }
@@ -207,7 +208,9 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
               content: `Great! Now let's move on to ${nextCatName} discovery.`,
               timestamp: new Date().toISOString()
             });
-            askNextQuestion();
+            // Explicitly ask for the next category's questions so we don't
+            // accidentally reuse the previous category from a stale closure.
+            askNextQuestion(nextCatId);
           }, 1000);
         }
       }
