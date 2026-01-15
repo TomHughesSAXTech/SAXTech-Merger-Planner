@@ -553,6 +553,172 @@
     const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(val) || 0);
     const formatPercent = (val) => (parseFloat(val) || 0).toFixed(1) + '%';
     
+    // Azure Blob Storage configuration for saving/loading MA SOW proposals
+    const azureBlobConfig = {
+      storageAccount: 'saxtechmegamind',
+      containerName: 'msp-quotes',
+      // Shared with MSP Quote Builder (container-level SAS, valid until 2028-01-01)
+      sasToken: 'se=2028-01-01T00%3A00%3A00Z&sp=racwdl&sv=2022-11-02&sr=c&sig=MUnEBz6Bl94xYd460NOwqERa0Rtgwy/POulgp4Zu9dU%3D',
+      baseUrl: 'https://saxtechmegamind.blob.core.windows.net',
+    };
+
+    const getMaSowIndexUrl = () => `${azureBlobConfig.baseUrl}/${azureBlobConfig.containerName}/ma-sow-index.json?${azureBlobConfig.sasToken}`;
+
+    async function loadMaSowProposalsFromBlob() {
+      try {
+        const indexUrl = getMaSowIndexUrl();
+        const response = await fetch(indexUrl);
+        if (response.ok) {
+          const indexData = await response.json();
+          return indexData.proposals || [];
+        }
+        if (response.status === 404) {
+          console.log('📋 No MA SOW index found in Azure Blob Storage yet; starting fresh.');
+          return [];
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      } catch (err) {
+        console.error('❌ Failed to load MA SOW proposals index from blob:', err);
+        return [];
+      }
+    }
+
+    async function loadMaSowProposalBlob(filename) {
+      if (!filename) return null;
+      const blobUrl = `${azureBlobConfig.baseUrl}/${azureBlobConfig.containerName}/${filename}?${azureBlobConfig.sasToken}`;
+      console.log('📁 Loading MA SOW proposal blob:', blobUrl.split('?')[0]);
+      const response = await fetch(blobUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load proposal blob: HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    async function updateMaSowIndex(filename, proposalBlob) {
+      try {
+        let proposals = await loadMaSowProposalsFromBlob();
+        const meta = {
+          id: proposalBlob.id,
+          filename,
+          projectName: proposalBlob.coverData?.projectName || '',
+          customerId: proposalBlob.coverData?.customerId || '',
+          savedAt: proposalBlob.savedAt,
+          grandTotalRevenue: proposalBlob.totals?.grandTotalRevenue ?? 0,
+          grossMargin: proposalBlob.totals?.grossMargin ?? 0,
+          totalHours: proposalBlob.totals?.totalHours ?? 0,
+        };
+
+        proposals = proposals.filter((p) => p.id !== meta.id);
+        proposals.unshift(meta);
+        proposals = proposals.slice(0, 100);
+
+        const indexUrl = getMaSowIndexUrl();
+        const indexData = {
+          lastUpdated: new Date().toISOString(),
+          proposalsCount: proposals.length,
+          proposals,
+        };
+
+        const response = await fetch(indexUrl, {
+          method: 'PUT',
+          headers: {
+            'x-ms-blob-type': 'BlockBlob',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(indexData, null, 2),
+        });
+
+        if (!response.ok) {
+          console.error('❌ Failed to update MA SOW index blob:', response.status, await response.text());
+        } else {
+          console.log('✅ MA SOW index updated in Azure Blob Storage');
+        }
+      } catch (err) {
+        console.error('❌ Error updating MA SOW index:', err);
+      }
+    }
+
+    async function saveMaSowProposalToBlob(proposalData) {
+      console.log('📁 Saving M&A SOW proposal to Azure Blob Storage...');
+      const timestamp = new Date().toISOString();
+      const projectNameSafe = (proposalData.coverData?.projectName || 'unnamed')
+        .replace(/[^a-zA-Z0-9]/g, '-')
+        .toLowerCase();
+      const id = Date.now();
+      const filename = `ma-sow-${id}-${projectNameSafe}.json`;
+      const blobUrl = `${azureBlobConfig.baseUrl}/${azureBlobConfig.containerName}/${filename}?${azureBlobConfig.sasToken}`;
+      console.log('🔗 Proposal blob URL:', blobUrl.split('?')[0]);
+
+      const payload = {
+        ...proposalData,
+        id,
+        savedAt: timestamp,
+        version: '1.0',
+      };
+
+      const response = await fetch(blobUrl, {
+        method: 'PUT',
+        headers: {
+          'x-ms-blob-type': 'BlockBlob',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload, null, 2),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('❌ Failed to save MA SOW proposal blob:', response.status, text);
+        return { success: false, message: text };
+      }
+
+      await updateMaSowIndex(filename, payload);
+      return { success: true, filename, id };
+    }
+
+    async function deleteMaSowProposalFromBlob(entry) {
+      const id = entry.id;
+      const filename = entry.filename;
+
+      try {
+        if (filename) {
+          const blobUrl = `${azureBlobConfig.baseUrl}/${azureBlobConfig.containerName}/${filename}?${azureBlobConfig.sasToken}`;
+          console.log('🗑️ Deleting MA SOW proposal blob:', blobUrl.split('?')[0]);
+          const deleteResponse = await fetch(blobUrl, { method: 'DELETE' });
+          if (!deleteResponse.ok && deleteResponse.status !== 404) {
+            console.warn('⚠️ Failed to delete proposal blob:', deleteResponse.status);
+          }
+        }
+
+        let proposals = await loadMaSowProposalsFromBlob();
+        proposals = proposals.filter((p) => p.id !== id && p.filename !== filename);
+
+        const indexUrl = getMaSowIndexUrl();
+        const indexData = {
+          lastUpdated: new Date().toISOString(),
+          proposalsCount: proposals.length,
+          proposals,
+        };
+
+        const response = await fetch(indexUrl, {
+          method: 'PUT',
+          headers: {
+            'x-ms-blob-type': 'BlockBlob',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(indexData, null, 2),
+        });
+
+        if (!response.ok) {
+          console.warn('⚠️ Failed to update MA SOW index after delete:', response.status, await response.text());
+        } else {
+          console.log('✅ MA SOW index updated after delete');
+        }
+      } catch (err) {
+        console.error('❌ Error deleting MA SOW proposal from blob/index:', err);
+        throw err;
+      }
+    }
+    
     // Main App
     function App() {
       const [activeTab, setActiveTab] = useState('cover');
@@ -633,6 +799,10 @@
       });
       
       const [billableTools, setBillableTools] = useState([{ id: 1, description: '', cost: 0, qty: 0, notes: '' }]);
+
+      // Saved proposal history (from Azure Blob Storage)
+      const [savedProposals, setSavedProposals] = useState([]);
+      const [isLoadingProposals, setIsLoadingProposals] = useState(false);
       
       // SAX signature
       const [saxSignatureData, setSaxSignatureData] = useState(null);
@@ -700,9 +870,12 @@
         let total = Object.keys(billableExpenses).reduce((sum, key) => sum + calcExpenseTotal(billableExpenses[key], key), 0);
         total += billableTools.reduce((sum, t) => sum + (t.cost * t.qty), 0);
         return total;
-      }, [billableExpenses, billableTools]);
+      }, [billableExpenses, billableTools, expenseConstants, getEffectiveRate]);
       
-      const totalNonBillableExpenses = useMemo(() => Object.keys(nonBillableExpenses).reduce((sum, key) => sum + calcExpenseTotal(nonBillableExpenses[key], key), 0), [nonBillableExpenses]);
+      const totalNonBillableExpenses = useMemo(
+        () => Object.keys(nonBillableExpenses).reduce((sum, key) => sum + calcExpenseTotal(nonBillableExpenses[key], key), 0),
+        [nonBillableExpenses, expenseConstants, getEffectiveRate],
+      );
       
       const grandTotalRevenue = laborRevenue + productsTotal + productsInstallLabor + totalBillableExpenses;
       const grandTotalCost = laborCost + productsCost + totalNonBillableExpenses;
@@ -714,6 +887,135 @@
       const avgHourlyRate = totalHours > 0 ? laborRevenue / totalHours : 0;
       const estimatedWeeks = useMemo(() => Math.ceil(totalHours / 40), [totalHours]);
       const changeOrdersTotal = useMemo(() => changeOrders.reduce((sum, co) => sum + (co.approved ? co.amount : 0), 0), [changeOrders]);
+      
+      // Build a snapshot payload for saving proposals
+      const buildProposalPayload = useCallback(
+        () => ({
+          coverData,
+          scopeData,
+          serviceItems,
+          products,
+          changeOrders,
+          rates,
+          expenseConstants,
+          billableExpenses,
+          nonBillableExpenses,
+          billableTools,
+          clientToggles,
+          totals: {
+            totalHours,
+            laborRevenue,
+            productsTotal,
+            productsInstallLabor,
+            totalBillableExpenses,
+            totalNonBillableExpenses,
+            grandTotalRevenue,
+            grossProfit,
+            grossMargin,
+          },
+          saxSignatureData,
+          saxSignerName,
+          saxSignerTitle,
+        }),
+        [
+          coverData,
+          scopeData,
+          serviceItems,
+          products,
+          changeOrders,
+          rates,
+          expenseConstants,
+          billableExpenses,
+          nonBillableExpenses,
+          billableTools,
+          clientToggles,
+          totalHours,
+          laborRevenue,
+          productsTotal,
+          productsInstallLabor,
+          totalBillableExpenses,
+          totalNonBillableExpenses,
+          grandTotalRevenue,
+          grossProfit,
+          grossMargin,
+          saxSignatureData,
+          saxSignerName,
+          saxSignerTitle,
+        ],
+      );
+
+      const loadProposalHistory = useCallback(async () => {
+        try {
+          setIsLoadingProposals(true);
+          const proposals = await loadMaSowProposalsFromBlob();
+          setSavedProposals(proposals);
+        } catch (err) {
+          console.error('❌ Failed to load MA SOW proposal history:', err);
+        } finally {
+          setIsLoadingProposals(false);
+        }
+      }, []);
+
+      useEffect(() => {
+        loadProposalHistory();
+      }, [loadProposalHistory]);
+
+      const handleSaveProposal = async () => {
+        try {
+          const payload = buildProposalPayload();
+          const result = await saveMaSowProposalToBlob(payload);
+          if (result?.success) {
+            alert('✅ Proposal saved to Azure Blob Storage.');
+            await loadProposalHistory();
+          } else {
+            alert('⚠️ Proposal save failed. See console for details.');
+          }
+        } catch (err) {
+          console.error('❌ Error saving MA SOW proposal to Azure Blob Storage:', err);
+          alert('⚠️ Error saving proposal: ' + err.message);
+        }
+      };
+
+      const handleLoadProposal = async (entry) => {
+        try {
+          const full = await loadMaSowProposalBlob(entry.filename);
+          if (!full) {
+            alert('Unable to load proposal details from Azure Blob Storage.');
+            return;
+          }
+
+          if (full.coverData) setCoverData(full.coverData);
+          if (full.scopeData) setScopeData(full.scopeData);
+          if (Array.isArray(full.serviceItems)) setServiceItems(full.serviceItems);
+          if (Array.isArray(full.products)) setProducts(full.products);
+          if (Array.isArray(full.changeOrders)) setChangeOrders(full.changeOrders);
+          if (full.rates) setRates((prev) => ({ ...prev, ...full.rates }));
+          if (full.expenseConstants) setExpenseConstants(full.expenseConstants);
+          if (full.billableExpenses) setBillableExpenses(full.billableExpenses);
+          if (full.nonBillableExpenses) setNonBillableExpenses(full.nonBillableExpenses);
+          if (Array.isArray(full.billableTools)) setBillableTools(full.billableTools);
+          if (full.clientToggles) setClientToggles(full.clientToggles);
+          if (full.saxSignatureData) setSaxSignatureData(full.saxSignatureData);
+          if (full.saxSignerName) setSaxSignerName(full.saxSignerName);
+          if (full.saxSignerTitle) setSaxSignerTitle(full.saxSignerTitle);
+
+          setActiveTab('cover');
+        } catch (err) {
+          console.error('❌ Failed to load MA SOW proposal from Azure Blob Storage:', err);
+          alert('⚠️ Error loading proposal: ' + err.message);
+        }
+      };
+
+      const handleDeleteProposal = async (entry) => {
+        if (!window.confirm('Delete this saved proposal from Azure Blob Storage? This cannot be undone.')) return;
+        try {
+          await deleteMaSowProposalFromBlob(entry);
+          await loadProposalHistory();
+        } catch (err) {
+          console.error('❌ Failed to delete MA SOW proposal from Azure Blob Storage:', err);
+          alert('⚠️ Error deleting proposal: ' + err.message);
+        }
+      };
       
       // Auto-load from MA Onboarding execution plan via sow-builder-data when sessionId is provided
       useEffect(() => {
@@ -973,6 +1275,7 @@
         { id: 'config', label: '⚙️ Config' },
         { id: 'preview', label: 'Preview' },
         { id: 'client', label: 'Client SOW' },
+        { id: 'history', label: '📚 History' },
         { id: 'changeorder', label: '📝 CO' },
       ];
       
@@ -984,9 +1287,11 @@
           </div>
           
           <div className="export-bar">
-            <span>📤 Export:</span>
-            <button className="btn btn-primary" onClick={exportToExcel}>📊 Export to Excel (.xlsx)</button>
+            <span>📤 Actions:</span>
+            <button className="btn btn-primary" onClick={handleSaveProposal}>💾 Save Proposal to Azure</button>
+            <button className="btn btn-secondary" onClick={exportToExcel}>📊 Export to Excel (.xlsx)</button>
             <button className="btn btn-secondary" onClick={() => window.print()}>🖨️ Print</button>
+            <button className="btn btn-secondary" onClick={() => setActiveTab('history')}>📚 History</button>
           </div>
           
           <div className="nav-tabs">
@@ -1075,6 +1380,20 @@
             <div className="header"><span className="robot-icon">✍️</span><h1>Client SOW</h1><p>Client-Facing Statement of Work</p></div>
             <div className="content-area">
               <ClientSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} estimatedWeeks={estimatedWeeks} clientToggles={clientToggles} setClientToggles={setClientToggles} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} maintenanceWindowsNeeded={maintenanceWindowsNeeded} totalOutageHours={totalOutageHours} saxSignatureData={saxSignatureData} saxSignerName={saxSignerName} saxSignerTitle={saxSignerTitle} />
+            </div>
+          </div>
+
+          {/* History Tab */}
+          <div className={`container ${activeTab === 'history' ? 'active' : ''}`}>
+            <div className="header"><span className="robot-icon">📚</span><h1>Proposal History</h1><p>Load saved M&A SOW proposals from Azure Blob Storage</p></div>
+            <div className="content-area">
+              <ProposalHistoryTab
+                proposals={savedProposals}
+                isLoading={isLoadingProposals}
+                onReload={loadProposalHistory}
+                onLoad={handleLoadProposal}
+                onDelete={handleDeleteProposal}
+              />
             </div>
           </div>
           
@@ -1598,6 +1917,66 @@
       );
     }
     
+    function ProposalHistoryTab({ proposals, isLoading, onReload, onLoad, onDelete }) {
+      return (
+        <div>
+          <h2 className="section-title">Proposal History</h2>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>
+              {proposals && proposals.length
+                ? `${proposals.length} saved proposal${proposals.length === 1 ? '' : 's'}`
+                : 'No saved proposals found.'}
+            </span>
+            <button className="btn btn-secondary" onClick={onReload}>🔄 Refresh</button>
+          </div>
+          {isLoading && (
+            <div style={{ padding: 20, color: '#6c757d' }}>Loading proposals from Azure Blob Storage...</div>
+          )}
+          {!isLoading && proposals && proposals.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Client</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                  <th style={{ textAlign: 'right' }}>Margin</th>
+                  <th style={{ width: 200 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proposals.map((p) => (
+                  <tr key={p.id || p.filename}>
+                    <td>{p.projectName || 'Untitled Project'}</td>
+                    <td>{p.customerId || '—'}</td>
+                    <td>{p.savedAt ? new Date(p.savedAt).toLocaleString() : '—'}</td>
+                    <td className="currency">{formatCurrency(p.grandTotalRevenue || 0)}</td>
+                    <td className="number">{formatPercent(p.grossMargin || 0)}</td>
+                    <td>
+                      <button
+                        className="btn btn-primary"
+                        style={{ marginRight: 6, padding: '4px 10px', fontSize: '0.75rem' }}
+                        onClick={() => onLoad(p)}
+                      >
+                        Load
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                        onClick={() => onDelete(p)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      );
+    }
+
     // Change Order Tab
     function ChangeOrderTab({ changeOrders, addChangeOrder, updateChangeOrder, deleteChangeOrder, rates, getEffectiveRate, changeOrdersTotal }) {
       const addItem = (coId) => {
