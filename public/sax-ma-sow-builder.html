@@ -602,6 +602,7 @@
           filename,
           projectName: proposalBlob.coverData?.projectName || '',
           customerId: proposalBlob.coverData?.customerId || '',
+          displayName: proposalBlob.displayName || proposalBlob.coverData?.projectName || '',
           savedAt: proposalBlob.savedAt,
           grandTotalRevenue: proposalBlob.totals?.grandTotalRevenue ?? 0,
           grossMargin: proposalBlob.totals?.grossMargin ?? 0,
@@ -851,10 +852,14 @@
       });
       
       const [billableTools, setBillableTools] = useState([{ id: 1, description: '', cost: 0, qty: 0, notes: '' }]);
-
+ 
       // Saved proposal history (from Azure Blob Storage)
       const [savedProposals, setSavedProposals] = useState([]);
       const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+
+      // Save modal state
+      const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+      const [saveName, setSaveName] = useState('');
       
       // SAX signature
       const [saxSignatureData, setSaxSignatureData] = useState(null);
@@ -1015,12 +1020,25 @@
         loadProposalHistory();
       }, [loadProposalHistory]);
 
-      const handleSaveProposal = async () => {
+      const openSaveModal = () => {
+        const now = new Date();
+        const dateStr = now.toLocaleString();
+        const baseName = coverData.projectName || 'Project';
+        const clientPart = coverData.customerId ? ` - ${coverData.customerId}` : '';
+        setSaveName(`${baseName}${clientPart} - ${dateStr}`);
+        setIsSaveModalOpen(true);
+      };
+
+      const handleConfirmSaveProposal = async () => {
         try {
           const payload = buildProposalPayload();
-          const result = await saveMaSowProposalToBlob(payload);
+          const extendedPayload = {
+            ...payload,
+            displayName: saveName || payload.coverData?.projectName || 'Project',
+          };
+          const result = await saveMaSowProposalToBlob(extendedPayload);
           if (result?.success) {
-            alert('✅ Proposal saved to Azure Blob Storage.');
+            setIsSaveModalOpen(false);
             await loadProposalHistory();
           } else {
             alert('⚠️ Proposal save failed. See console for details.');
@@ -1371,7 +1389,7 @@
           
           <div className="export-bar">
             <span>📤 Actions:</span>
-            <button className="btn btn-primary" onClick={handleSaveProposal}>💾 Save Proposal to Azure</button>
+            <button className="btn btn-primary" onClick={openSaveModal}>💾 Save Proposal to Azure</button>
             <button className="btn btn-secondary" onClick={exportToExcel}>📊 Export to Excel (.xlsx)</button>
             <button className="btn btn-secondary" onClick={() => window.print()}>🖨️ Print</button>
             <button className="btn btn-secondary" onClick={() => setActiveTab('history')}>📚 History</button>
@@ -1504,6 +1522,54 @@
               <ChangeOrderTab changeOrders={changeOrders} addChangeOrder={addChangeOrder} updateChangeOrder={updateChangeOrder} deleteChangeOrder={deleteChangeOrder} rates={rates} getEffectiveRate={getEffectiveRate} changeOrdersTotal={changeOrdersTotal} />
             </div>
           </div>
+
+          {/* Save Proposal Modal */}
+          {isSaveModalOpen && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: 8,
+                padding: 20,
+                maxWidth: 500,
+                width: '90%',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+              }}>
+                <h3 style={{ marginBottom: 10 }}>Save Proposal to Azure</h3>
+                <p style={{ fontSize: '0.9rem', color: '#6c757d', marginBottom: 10 }}>
+                  A timestamp will be stored automatically. You can customize this display name for the
+                  proposal history.
+                </p>
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label>Proposal Name</label>
+                  <input
+                    type="text"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    className="inline-edit"
+                  />
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 16 }}>
+                  Current time: {new Date().toLocaleString()}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <button className="btn btn-secondary" type="button" onClick={() => setIsSaveModalOpen(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" type="button" onClick={handleConfirmSaveProposal}>
+                    💾 Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -1579,6 +1645,13 @@
     function ServicesTab({ serviceItems, rates, getEffectiveRate, updateServiceItem, addServiceItem, deleteServiceItem, updatePhaseName, addPhase, deletePhase, totalHours, laborRevenue, avgHourlyCost, avgHourlyRate, phaseTotals, onApplyDefaultTemplate, onSaveDefaultTemplate }) {
       const [expandedTasks, setExpandedTasks] = useState({});
       const toggleExpanded = (id) => setExpandedTasks(prev => ({ ...prev, [id]: !prev[id] }));
+
+      const autosizeDetailTextarea = (el) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+      };
+
       return (
         <div>
           <h2 className="section-title">Services Estimation</h2>
@@ -1706,6 +1779,7 @@
                                     e.target.style.height = 'auto';
                                     e.target.style.height = `${e.target.scrollHeight}px`;
                                   }}
+                                  ref={autosizeDetailTextarea}
                                   style={{ width: '100%', overflow: 'hidden', resize: 'none' }}
                                 />
                               </td>
@@ -2167,7 +2241,7 @@
               <tbody>
                 {proposals.map((p) => (
                   <tr key={p.id || p.filename}>
-                    <td>{p.projectName || 'Untitled Project'}</td>
+                    <td>{p.displayName || p.projectName || 'Untitled Project'}</td>
                     <td>{p.customerId || '—'}</td>
                     <td>{p.savedAt ? new Date(p.savedAt).toLocaleString() : '—'}</td>
                     <td className="currency">{formatCurrency(p.grandTotalRevenue || 0)}</td>
