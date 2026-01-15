@@ -67,6 +67,9 @@ function App() {
   );
   const [config, setConfig] = useState(null);
   const [viewMode, setViewMode] = useState('plan'); // 'plan' | 'network'
+  const [planHistory, setPlanHistory] = useState([]);
+  const [showPlanHistory, setShowPlanHistory] = useState(false);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   const persistSessionId = (id) => {
     try {
@@ -293,9 +296,24 @@ function App() {
     setCurrentPhase(categoryId);
   };
 
+  const filterBaseGraph = () => {
+    // Keep non-plan nodes/edges (root + discovery categories), drop previous phases/tasks
+    const baseNodes = nodes.filter((n) => {
+      const t = n.data?.type;
+      if (t === 'phase' || t === 'task') return false;
+      if (n.id.startsWith('phase-') || n.id.startsWith('task-')) return false;
+      return true;
+    });
+    const baseNodeIds = new Set(baseNodes.map((n) => n.id));
+    const baseEdges = edges.filter((e) => baseNodeIds.has(e.source) && baseNodeIds.has(e.target));
+    return { baseNodes, baseEdges };
+  };
+
   const generateExecutionPlan = async () => {
+    if (!sessionId) return;
     setIsProcessing(true);
     try {
+      const { baseNodes, baseEdges } = filterBaseGraph();
       const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -308,11 +326,11 @@ function App() {
       
       const plan = await response.json();
       
-      // Add plan nodes to the tree
+      // Replace any existing plan nodes with the new plan
       if (plan.planNodes) {
-        const updatedNodes = [...nodes, ...plan.planNodes];
-        const updatedEdges = [...edges, ...plan.planEdges];
-        
+        const { baseNodes, baseEdges } = filterBaseGraph();
+        const updatedNodes = [...baseNodes, ...(plan.planNodes || [])];
+        const updatedEdges = [...baseEdges, ...(plan.planEdges || [])];
         const layouted = getLayoutedElements(updatedNodes, updatedEdges);
         setNodes(layouted.nodes);
         setEdges(layouted.edges);
@@ -341,6 +359,96 @@ function App() {
       console.log('ConnectWise tickets created:', result);
     } catch (error) {
       console.error('Failed to create ConnectWise tickets:', error);
+    }
+  };
+
+  const saveCurrentPlan = async () => {
+    if (!sessionId) return;
+    const name = window.prompt('Save plan as (name):', 'Execution Plan');
+    if (!name) return;
+    setIsSavingPlan(true);
+    try {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, name, nodes, edges })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data && Array.isArray(data.history)) {
+        setPlanHistory(data.history);
+        setShowPlanHistory(true);
+      } else {
+        console.error('Failed to save plan history:', data);
+      }
+    } catch (error) {
+      console.error('Error saving plan history:', error);
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const loadPlanHistory = async () => {
+    if (!sessionId) return;
+    try {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data && Array.isArray(data.history)) {
+        setPlanHistory(data.history);
+        setShowPlanHistory(true);
+      } else {
+        console.error('Failed to load plan history list:', data);
+      }
+    } catch (error) {
+      console.error('Error loading plan history list:', error);
+    }
+  };
+
+  const applyHistoryEntry = async (planId) => {
+    if (!sessionId || !planId) return;
+    try {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, planId })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data) {
+        const { nodes: histNodes = [], edges: histEdges = [] } = data;
+        const { baseNodes, baseEdges } = filterBaseGraph();
+        const updatedNodes = [...baseNodes, ...histNodes];
+        const updatedEdges = [...baseEdges, ...histEdges];
+        const layouted = getLayoutedElements(updatedNodes, updatedEdges);
+        setNodes(layouted.nodes);
+        setEdges(layouted.edges);
+        setShowPlanHistory(false);
+      } else {
+        console.error('Failed to load plan history entry:', data);
+      }
+    } catch (error) {
+      console.error('Error applying plan history entry:', error);
+    }
+  };
+
+  const deleteHistoryEntry = async (planId) => {
+    if (!sessionId || !planId) return;
+    try {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, planId })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data && Array.isArray(data.history)) {
+        setPlanHistory(data.history);
+      } else {
+        console.error('Failed to delete plan history entry:', data);
+      }
+    } catch (error) {
+      console.error('Error deleting plan history entry:', error);
     }
   };
 
@@ -405,6 +513,20 @@ function App() {
             className="btn btn-primary"
           >
             <Play className="inline" /> Generate Plan
+          </button>
+          <button
+            onClick={saveCurrentPlan}
+            disabled={!sessionId || isSavingPlan}
+            className="btn btn-secondary"
+          >
+            Save Plan
+          </button>
+          <button
+            onClick={loadPlanHistory}
+            disabled={!sessionId}
+            className="btn btn-secondary"
+          >
+            Plan History
           </button>
           <button onClick={exportTree} className="btn btn-secondary">
             <Download className="inline" /> Export
@@ -485,6 +607,54 @@ function App() {
       {isProcessing && (
         <div className="processing-overlay">
           <div className="processing-spinner">Processing...</div>
+        </div>
+      )}
+
+      {showPlanHistory && (
+        <div className="processing-overlay" onClick={() => setShowPlanHistory(false)}>
+          <div
+            className="processing-spinner"
+            onClick={(e) => e.stopPropagation()}
+            style={{ minWidth: '420px', maxHeight: '60vh', overflowY: 'auto' }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>Saved Plans</div>
+            {(!planHistory || planHistory.length === 0) && (
+              <div style={{ fontSize: '0.8rem' }}>No saved plans for this session.</div>
+            )}
+            {planHistory && planHistory.map((h) => (
+              <div
+                key={h.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600 }}>{h.name}</div>
+                  <div style={{ opacity: 0.7 }}>{h.createdAt}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    onClick={() => applyHistoryEntry(h.id)}
+                  >
+                    Load
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    onClick={() => deleteHistoryEntry(h.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
