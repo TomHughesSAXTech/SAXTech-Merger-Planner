@@ -939,6 +939,122 @@
         () => Object.keys(nonBillableExpenses).reduce((sum, key) => sum + calcExpenseTotal(nonBillableExpenses[key], key), 0),
         [nonBillableExpenses, expenseConstants, getEffectiveRate],
       );
+
+      // Rate class management
+      const addRateClass = () => {
+        setRates(prev => {
+          const baseName = 'NEW';
+          let idx = 1;
+          let key = baseName;
+          while (prev[key]) {
+            idx += 1;
+            key = `${baseName}${idx}`;
+          }
+          const next = {
+            ...prev,
+            [key]: {
+              title: 'New Role',
+              serviceType: 'TI',
+              salaryAnnual: 0,
+              baseCost: 0,
+              burdenPercent: 35,
+              mspPrice: 0,
+              nonMspPrice: 0,
+              afterHoursPercent: 50,
+            },
+          };
+          setBillableExpenses(bePrev => ({
+            ...bePrev,
+            [key]: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+          }));
+          setNonBillableExpenses(nbePrev => ({
+            ...nbePrev,
+            [key]: { trips: 0, mileage: 0, travelHours: 0, expenseDays: 0, airfare: 0, misc: 0, rentalCar: 0 },
+          }));
+          return next;
+        });
+      };
+
+      const renameRateClass = (oldKey, newKeyRaw) => {
+        const newKey = (newKeyRaw || '').trim();
+        if (!newKey || newKey === oldKey) return;
+        if (rates[newKey]) {
+          alert('A class with that code already exists. Please choose a different code.');
+          return;
+        }
+        // Update rates
+        setRates(prev => {
+          if (!prev[oldKey] || prev[newKey]) return prev;
+          const { [oldKey]: oldRate, ...rest } = prev;
+          return { ...rest, [newKey]: { ...oldRate } };
+        });
+        // Update expenses
+        setBillableExpenses(prev => {
+          if (!prev[oldKey]) return prev;
+          const { [oldKey]: oldVal, ...rest } = prev;
+          return { ...rest, [newKey]: { ...oldVal } };
+        });
+        setNonBillableExpenses(prev => {
+          if (!prev[oldKey]) return prev;
+          const { [oldKey]: oldVal, ...rest } = prev;
+          return { ...rest, [newKey]: { ...oldVal } };
+        });
+        // Update references in services, products, change orders
+        setServiceItems(prev => prev.map(phase => ({
+          ...phase,
+          subItems: phase.subItems.map(item =>
+            item.resourceClass === oldKey ? { ...item, resourceClass: newKey } : item,
+          ),
+        })));
+        setProducts(prev => prev.map(p =>
+          p.installResource === oldKey ? { ...p, installResource: newKey } : p,
+        ));
+        setChangeOrders(prev => prev.map(co => ({
+          ...co,
+          items: (co.items || []).map(i =>
+            i.resourceClass === oldKey ? { ...i, resourceClass: newKey } : i,
+          ),
+        })));
+      };
+
+      const deleteRateClass = (keyToDelete) => {
+        const currentKeys = Object.keys(rates);
+        if (currentKeys.length <= 1) {
+          alert('At least one rate class is required.');
+          return;
+        }
+        const fallbackKey = currentKeys.find(k => k !== keyToDelete);
+        if (!fallbackKey) return;
+        if (!window.confirm(`Delete class "${keyToDelete}"? Any tasks/products using it will be moved to "${fallbackKey}".`)) return;
+
+        setRates(prev => {
+          const { [keyToDelete]: _removed, ...rest } = prev;
+          return rest;
+        });
+        setBillableExpenses(prev => {
+          const { [keyToDelete]: _removed, ...rest } = prev;
+          return rest;
+        });
+        setNonBillableExpenses(prev => {
+          const { [keyToDelete]: _removed, ...rest } = prev;
+          return rest;
+        });
+        setServiceItems(prev => prev.map(phase => ({
+          ...phase,
+          subItems: phase.subItems.map(item =>
+            item.resourceClass === keyToDelete ? { ...item, resourceClass: fallbackKey } : item,
+          ),
+        })));
+        setProducts(prev => prev.map(p =>
+          p.installResource === keyToDelete ? { ...p, installResource: fallbackKey } : p,
+        ));
+        setChangeOrders(prev => prev.map(co => ({
+          ...co,
+          items: (co.items || []).map(i =>
+            i.resourceClass === keyToDelete ? { ...i, resourceClass: fallbackKey } : i,
+          ),
+        })));
+      };
       
       const grandTotalRevenue = laborRevenue + productsTotal + productsInstallLabor + totalBillableExpenses;
       const grandTotalCost = laborCost + productsCost + totalNonBillableExpenses;
@@ -1611,7 +1727,23 @@
           <div className={`container ${activeTab === 'config' ? 'active' : ''}`}>
             <div className="header"><span className="robot-icon">⚙️</span><h1>Configurator</h1><p>Rates, Costs & System Settings</p></div>
             <div className="content-area">
-              <ConfiguratorTab rates={rates} setRates={setRates} expenseConstants={expenseConstants} setExpenseConstants={setExpenseConstants} coverData={coverData} setCoverData={setCoverData} saxSignerName={saxSignerName} setSaxSignerName={setSaxSignerName} saxSignerTitle={saxSignerTitle} setSaxSignerTitle={setSaxSignerTitle} saxSignatureData={saxSignatureData} setSaxSignatureData={setSaxSignatureData} />
+              <ConfiguratorTab
+                rates={rates}
+                setRates={setRates}
+                expenseConstants={expenseConstants}
+                setExpenseConstants={setExpenseConstants}
+                coverData={coverData}
+                setCoverData={setCoverData}
+                saxSignerName={saxSignerName}
+                setSaxSignerName={setSaxSignerName}
+                saxSignerTitle={saxSignerTitle}
+                setSaxSignerTitle={setSaxSignerTitle}
+                saxSignatureData={saxSignatureData}
+                setSaxSignatureData={setSaxSignatureData}
+                onAddClass={addRateClass}
+                onDeleteClass={deleteRateClass}
+                onRenameClass={renameRateClass}
+              />
             </div>
           </div>
           
@@ -2162,7 +2294,7 @@
     }
     
     // Configurator Tab
-    function ConfiguratorTab({ rates, setRates, expenseConstants, setExpenseConstants, coverData, setCoverData, saxSignerName, setSaxSignerName, saxSignerTitle, setSaxSignerTitle, saxSignatureData, setSaxSignatureData }) {
+    function ConfiguratorTab({ rates, setRates, expenseConstants, setExpenseConstants, coverData, setCoverData, saxSignerName, setSaxSignerName, saxSignerTitle, setSaxSignerTitle, saxSignatureData, setSaxSignatureData, onAddClass, onDeleteClass, onRenameClass }) {
       const canvasRef = useRef(null);
       const [drawing, setDrawing] = useState(false);
       useEffect(() => { const c = canvasRef.current; if (c) { const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); } }, []);
@@ -2224,6 +2356,7 @@
                     <th>Non-MSP $/hr</th>
                     <th>AH% Uplift</th>
                     <th>Suggested @ Target GM</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2241,7 +2374,14 @@
                     const ahMargin = ahRate > 0 ? ((ahRate - burdened) / ahRate) * 100 : 0;
                     return (
                       <tr key={k}>
-                        <td><strong>{k}</strong></td>
+                        <td>
+                          <input
+                            type="text"
+                            value={k}
+                            onChange={(e) => onRenameClass && onRenameClass(k, e.target.value)}
+                            style={{ width: 70, fontWeight: 'bold' }}
+                          />
+                        </td>
                         <td><input type="text" value={r.title} onChange={(e) => updateRate(k, 'title', e.target.value)} style={{ width: 150 }} /></td>
                         <td><select value={r.serviceType} onChange={(e) => updateRate(k, 'serviceType', e.target.value)}>{SERVICE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
                         <td>
@@ -2307,11 +2447,31 @@
                             ? <span>{formatCurrency(suggested)} / hr @ {targetMargin.toFixed(1)}% GM</span>
                             : <span style={{ opacity: 0.7 }}>Set a Target GM% on the Cover tab to see suggestions</span>}
                         </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                            onClick={() => onDeleteClass && onDeleteClass(k)}
+                            disabled={Object.keys(rates).length <= 1}
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+            <div style={{ marginTop: 10, textAlign: 'right' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => onAddClass && onAddClass()}
+              >
+                + Add Class
+              </button>
             </div>
           </div>
           <div className="config-section">
@@ -2451,10 +2611,28 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'letter');
         const el = document.getElementById('clientSOWDoc');
-        const canvas = await html2canvas(el, { scale: 2 });
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true });
         const img = canvas.toDataURL('image/png');
-        const w = 190, h = (canvas.height * w) / canvas.width;
-        doc.addImage(img, 'PNG', 10, 10, w, h);
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 10;
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = margin;
+
+        doc.addImage(img, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - margin * 2);
+
+        while (heightLeft > 0) {
+          doc.addPage();
+          position = heightLeft - imgHeight + margin;
+          doc.addImage(img, 'PNG', margin, position, imgWidth, imgHeight);
+          heightLeft -= (pageHeight - margin * 2);
+        }
+
         doc.save(`SAX_MA_SOW_${coverData.projectName || 'Project'}_${new Date().toISOString().split('T')[0]}.pdf`);
       };
       return (
