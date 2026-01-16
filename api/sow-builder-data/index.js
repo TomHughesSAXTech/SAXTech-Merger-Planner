@@ -88,7 +88,43 @@ module.exports = async function (context, req) {
     const executionPlan = session.executionPlan;
     const discoveryData = session.discoveryData || {};
 
-    // Reference template: baseline hours and phase structure for a
+    // Pre-compute deliverable and phase hour rollups from executionPlan
+    function computeRollups(plan) {
+      const rollups = {
+        totalHours: 0,
+        byPhase: [],
+        byDeliverable: {
+          deliverable1: 0,
+          deliverable2: 0,
+          deliverable3: 0,
+          deliverable4: 0,
+          projectManagement: 0,
+        },
+      };
+      if (!plan || !Array.isArray(plan.phases)) return rollups;
+
+      const d = rollups.byDeliverable;
+
+      plan.phases.forEach((phase) => {
+        const tasks = Array.isArray(phase.tasks) ? phase.tasks : [];
+        const hours = tasks.reduce((sum, t) => sum + (typeof t === 'object' && typeof t.hours === 'number' ? t.hours : 0), 0);
+        rollups.totalHours += hours;
+        rollups.byPhase.push({ id: phase.id, name: phase.name, hours });
+
+        const name = (phase.name || '').toLowerCase();
+        if (name.includes('server migration')) d.deliverable1 += hours;
+        else if (name.includes('user onboarding')) d.deliverable2 += hours;
+        else if (name.includes('data migration') || name.includes('lockdown')) d.deliverable3 += hours;
+        else if (name.includes('email') || name.includes('dns') || name.includes('onedrive') || name.includes('website')) d.deliverable4 += hours;
+        else if (name.includes('post-migration') || name.includes('stabilization') || name.includes('project management') || name.includes('pm')) d.projectManagement += hours;
+      });
+
+      return rollups;
+    }
+
+    const rollups = computeRollups(executionPlan);
+
+    // Helper: try to infer a customer/company name from discovery data
     // small-firm, two-server, five-user migration. This is used to
     // calibrate GPT's estimates so they stay in a realistic range.
     const baselineHoursTemplate = `
@@ -161,6 +197,15 @@ complex VPN/site topology, heavy application remediation, etc.).`;
 
     const transformPrompt = `You are helping map an M&A IT onboarding execution plan into a structured
 SAX SOW builder schema used for estimating hours.
+
+You should respect the following pre-computed rollups from the
+execution plan when assigning hours to service items:
+- Total plan hours: ${rollups.totalHours}
+- Phase hours: ${JSON.stringify(rollups.byPhase)}
+- Deliverable hours (reference): ${JSON.stringify(rollups.byDeliverable)}
+
+Use these as constraints so that the sum of service item hours by phase
+and by deliverable matches these rollups as closely as possible.
 
 Use the following reference project as a calibration example for
 phase structure and realistic hours for a two-server, five-user

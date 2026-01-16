@@ -249,6 +249,27 @@ Return STRICT JSON with this shape (no comments, no extra fields):
             }
         });
 
+        // Normalize phases to ensure Phase 0–5 naming is present
+        const phaseNameMap = {
+            0: 'Phase 0: Pre-Migration & Discovery',
+            1: 'Phase 1: Server Migration (Deliverable 1)',
+            2: 'Phase 2: User Onboarding (Deliverable 2)',
+            3: 'Phase 3: Data Migration/Lockdown/Backup (Deliverable 3)',
+            4: 'Phase 4: Email/OneDrive/Website/DNS Cutover (Deliverable 4)',
+            5: 'Phase 5: Post-Migration & Stabilization',
+        };
+
+        if (Array.isArray(plan.phases)) {
+            plan.phases = plan.phases.map((p, idx) => {
+                const mapped = { ...p };
+                if (idx in phaseNameMap) {
+                    mapped.name = mapped.name || phaseNameMap[idx];
+                    mapped.id = mapped.id || `phase${idx}`;
+                }
+                return mapped;
+            });
+        }
+
         session.executionPlan = plan;
         await container.item(sessionId, sessionId).replace(session);
 
