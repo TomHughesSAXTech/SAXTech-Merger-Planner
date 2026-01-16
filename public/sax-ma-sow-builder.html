@@ -543,9 +543,9 @@
     
     // Initial rate structure
     const initialRates = {
-      CXO: { title: 'CXO', serviceType: 'PM', baseCost: 100, burdenPercent: 35, mspPrice: 350, nonMspPrice: 400, afterHoursPercent: 50 },
-      DIO: { title: 'Director of IT Operations', serviceType: 'AD', baseCost: 91.35, burdenPercent: 35, mspPrice: 240, nonMspPrice: 275, afterHoursPercent: 50 },
-      SE: { title: 'Systems Engineer', serviceType: 'TI', baseCost: 33.65, burdenPercent: 35, mspPrice: 195, nonMspPrice: 225, afterHoursPercent: 50 },
+      CXO: { title: 'CXO', serviceType: 'PM', salaryAnnual: 208000, baseCost: 100, burdenPercent: 35, mspPrice: 350, nonMspPrice: 400, afterHoursPercent: 50 },
+      DIO: { title: 'Director of IT Operations', serviceType: 'AD', salaryAnnual: 190000, baseCost: 91.35, burdenPercent: 35, mspPrice: 240, nonMspPrice: 275, afterHoursPercent: 50 },
+      SE: { title: 'Systems Engineer', serviceType: 'TI', salaryAnnual: 70000, baseCost: 33.65, burdenPercent: 35, mspPrice: 195, nonMspPrice: 225, afterHoursPercent: 50 },
     };
     
     const getFullyBurdenedCost = (rate) => rate.baseCost * (1 + rate.burdenPercent / 100);
@@ -860,6 +860,9 @@
       // Save modal state
       const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
       const [saveName, setSaveName] = useState('');
+
+      // History modal state
+      const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
       
       // SAX signature
       const [saxSignatureData, setSaxSignatureData] = useState(null);
@@ -1027,6 +1030,11 @@
         const clientPart = coverData.customerId ? ` - ${coverData.customerId}` : '';
         setSaveName(`${baseName}${clientPart} - ${dateStr}`);
         setIsSaveModalOpen(true);
+      };
+
+      const openHistoryModal = () => {
+        setIsHistoryModalOpen(true);
+        loadProposalHistory();
       };
 
       const handleConfirmSaveProposal = async () => {
@@ -1224,6 +1232,10 @@
           ['Total Sell Price', grandTotalRevenue],
         ];
         const ws1 = XLSX.utils.aoa_to_sheet(coverSheet);
+        ws1['!cols'] = [
+          { wch: 28 },
+          { wch: 60 },
+        ];
         XLSX.utils.book_append_sheet(wb, ws1, 'Cover');
         
         // Services Estimator Sheet
@@ -1248,6 +1260,18 @@
         servicesData.push([]);
         servicesData.push(['TOTAL', '', '', totalHours, '', laborRevenue, '', '', totalOutageHours]);
         const ws2 = XLSX.utils.aoa_to_sheet(servicesData);
+        ws2['!cols'] = [
+          { wch: 22 },
+          { wch: 55 },
+          { wch: 18 },
+          { wch: 10 },
+          { wch: 12 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 14 },
+        ];
+        ws2['!pageSetup'] = { fitToWidth: 1, fitToHeight: 0, orientation: 'landscape' };
         XLSX.utils.book_append_sheet(wb, ws2, 'Services Estimator');
         
         // Expense Estimator Sheet
@@ -1280,6 +1304,23 @@
           expenseData.push([tool.description, tool.cost, tool.qty, tool.cost * tool.qty, tool.notes]);
         });
         const ws3 = XLSX.utils.aoa_to_sheet(expenseData);
+        ws3['!cols'] = [
+          { wch: 18 },
+          { wch: 12 },
+          { wch: 10 },
+          { wch: 10 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+        ];
+        ws3['!pageSetup'] = { fitToWidth: 1, fitToHeight: 0, orientation: 'landscape' };
         XLSX.utils.book_append_sheet(wb, ws3, 'Expense Estimator');
         
         // Margin Estimator Sheet
@@ -1307,6 +1348,18 @@
         marginData.push(['Gross Profit', grossProfit]);
         marginData.push(['Gross Margin %', grossMargin]);
         const ws4 = XLSX.utils.aoa_to_sheet(marginData);
+        ws4['!cols'] = [
+          { wch: 18 },
+          { wch: 16 },
+          { wch: 10 },
+          { wch: 16 },
+          { wch: 12 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 12 },
+        ];
+        ws4['!pageSetup'] = { fitToWidth: 1, fitToHeight: 0, orientation: 'landscape' };
         XLSX.utils.book_append_sheet(wb, ws4, 'Margin Estimator');
         
         // Rate Structure Sheet
@@ -1322,6 +1375,17 @@
         rateData.push(['Meals Per Day', expenseConstants.mealsPerDay]);
         rateData.push(['Lodging Per Night', expenseConstants.lodgingPerNight]);
         const ws5 = XLSX.utils.aoa_to_sheet(rateData);
+        ws5['!cols'] = [
+          { wch: 10 },
+          { wch: 24 },
+          { wch: 16 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 16 },
+          { wch: 14 },
+        ];
         XLSX.utils.book_append_sheet(wb, ws5, 'Rate Structure');
         
         // Products Sheet
@@ -1335,6 +1399,20 @@
         productsData.push([]);
         productsData.push(['TOTALS', '', productsCost, '', '', productsTotal, '', '', '', '', productsInstallLabor]);
         const ws6 = XLSX.utils.aoa_to_sheet(productsData);
+        ws6['!cols'] = [
+          { wch: 28 },
+          { wch: 18 },
+          { wch: 10 },
+          { wch: 8 },
+          { wch: 10 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 12 },
+          { wch: 14 },
+          { wch: 14 },
+        ];
+        ws6['!pageSetup'] = { fitToWidth: 1, fitToHeight: 0, orientation: 'landscape' };
         XLSX.utils.book_append_sheet(wb, ws6, 'Products');
         
         // Change Orders Sheet (if any)
@@ -1356,6 +1434,14 @@
             });
           });
           const ws7 = XLSX.utils.aoa_to_sheet(coData);
+          ws7['!cols'] = [
+            { wch: 28 },
+            { wch: 24 },
+            { wch: 18 },
+            { wch: 14 },
+            { wch: 14 },
+          ];
+          ws7['!pageSetup'] = { fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' };
           XLSX.utils.book_append_sheet(wb, ws7, 'Change Orders');
         }
         
@@ -1377,7 +1463,6 @@
         { id: 'config', label: '⚙️ Config' },
         { id: 'preview', label: 'Preview' },
         { id: 'client', label: 'Client SOW' },
-        { id: 'history', label: '📚 History' },
         { id: 'changeorder', label: '📝 CO' },
       ];
       
@@ -1393,7 +1478,7 @@
             <button className="btn btn-primary" onClick={openSaveModal}>💾 Save Proposal to Azure</button>
             <button className="btn btn-secondary" onClick={exportToExcel}>📊 Export to Excel (.xlsx)</button>
             <button className="btn btn-secondary" onClick={() => window.print()}>🖨️ Print</button>
-            <button className="btn btn-secondary" onClick={() => setActiveTab('history')}>📚 History</button>
+            <button className="btn btn-secondary" onClick={openHistoryModal}>📚 History</button>
           </div>
           
           <div className="nav-tabs">
@@ -1534,7 +1619,7 @@
           <div className={`container ${activeTab === 'preview' ? 'active' : ''}`}>
             <div className="header"><span className="robot-icon">👁️</span><h1>Preview SOW</h1><p>Internal Preview</p></div>
             <div className="content-area">
-              <PreviewSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} grossProfit={grossProfit} grossMargin={grossMargin} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} />
+              <PreviewSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} grossProfit={grossProfit} grossMargin={grossMargin} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} serviceItems={serviceItems} />
             </div>
           </div>
           
@@ -1546,19 +1631,6 @@
             </div>
           </div>
 
-          {/* History Tab */}
-          <div className={`container ${activeTab === 'history' ? 'active' : ''}`}>
-            <div className="header"><span className="robot-icon">📚</span><h1>Proposal History</h1><p>Load saved M&A SOW proposals from Azure Blob Storage</p></div>
-            <div className="content-area">
-              <ProposalHistoryTab
-                proposals={savedProposals}
-                isLoading={isLoadingProposals}
-                onReload={loadProposalHistory}
-                onLoad={handleLoadProposal}
-                onDelete={handleDeleteProposal}
-              />
-            </div>
-          </div>
           
           {/* Change Orders Tab */}
           <div className={`container ${activeTab === 'changeorder' ? 'active' : ''}`}>
@@ -1612,6 +1684,51 @@
                     💾 Save
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* History Modal */}
+          {isHistoryModalOpen && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: 8,
+                padding: 20,
+                maxWidth: 900,
+                width: '95%',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={{ marginBottom: 0 }}>Proposal History</h3>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setIsHistoryModalOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+                <ProposalHistoryTab
+                  proposals={savedProposals}
+                  isLoading={isLoadingProposals}
+                  onReload={loadProposalHistory}
+                  onLoad={(entry) => {
+                    handleLoadProposal(entry);
+                    setIsHistoryModalOpen(false);
+                  }}
+                  onDelete={handleDeleteProposal}
+                />
               </div>
             </div>
           )}
@@ -1975,7 +2092,19 @@
           <h2 className="section-title">Margin Analysis</h2>
           <div className="subsection-title">By Resource</div>
           <table>
-            <thead><tr><th>Resource</th><th>Type</th><th>Hours</th><th>Burdened</th><th>Rate</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Resource</th>
+                <th>Type</th>
+                <th className="number">Hours</th>
+                <th className="currency">Burdened</th>
+                <th className="currency">Rate</th>
+                <th className="currency">Revenue</th>
+                <th className="currency">Cost</th>
+                <th className="currency">Profit</th>
+                <th className="number">Margin</th>
+              </tr>
+            </thead>
             <tbody>
               {data.map(r => (
                 <tr key={r.k}>
@@ -2008,7 +2137,19 @@
           <h2 className="section-title">Rate Structure</h2>
           <p style={{ color: '#6c757d', marginBottom: 15 }}>Edit in Configurator tab</p>
           <table>
-            <thead><tr><th>Class</th><th>Title</th><th>Type</th><th>Base Cost</th><th>Burden%</th><th>Burdened</th><th>MSP$</th><th>Non-MSP$</th><th>AH%</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th className="currency">Base Cost</th>
+                <th className="number">Burden%</th>
+                <th className="currency">Burdened</th>
+                <th className="currency">MSP$</th>
+                <th className="currency">Non-MSP$</th>
+                <th className="number">AH%</th>
+              </tr>
+            </thead>
             <tbody>
               {Object.keys(rates).map(k => {
                 const r = rates[k];
@@ -2041,6 +2182,24 @@
         return burdenedCost / (1 - m);
       };
 
+      const HOURS_PER_YEAR = 2080;
+
+      const handleSalaryChange = (k, value) => {
+        const salary = parseFloat(value) || 0;
+        setRates(prev => {
+          const existing = prev[k] || {};
+          const hourly = salary > 0 ? salary / HOURS_PER_YEAR : existing.baseCost || 0;
+          return {
+            ...prev,
+            [k]: {
+              ...existing,
+              salaryAnnual: salary,
+              baseCost: hourly,
+            },
+          };
+        });
+      };
+
       return (
         <div>
           <h2 className="section-title">Configuration</h2>
@@ -2057,11 +2216,13 @@
                     <th>Class</th>
                     <th>Title</th>
                     <th>Type</th>
-                    <th>Base$</th>
+                    <th>Salary/Yr</th>
+                    <th>Base $/hr</th>
                     <th>Burden%</th>
-                    <th>MSP$</th>
-                    <th>Non-MSP$</th>
-                    <th>AH%</th>
+                    <th>Burdened $/hr</th>
+                    <th>MSP $/hr</th>
+                    <th>Non-MSP $/hr</th>
+                    <th>AH% Uplift</th>
                     <th>Suggested @ Target GM</th>
                   </tr>
                 </thead>
@@ -2070,16 +2231,77 @@
                     const r = rates[k];
                     const burdened = getFullyBurdenedCost(r);
                     const suggested = getTargetRateForMargin(burdened);
+                    const salary = r.salaryAnnual || 0;
+                    const mspRate = parseFloat(r.mspPrice) || 0;
+                    const nonMspRate = parseFloat(r.nonMspPrice) || 0;
+                    const ahPct = parseFloat(r.afterHoursPercent) || 0;
+                    const ahRate = mspRate && ahPct ? mspRate * (1 + ahPct / 100) : 0;
+                    const mspMargin = mspRate > 0 ? ((mspRate - burdened) / mspRate) * 100 : 0;
+                    const nonMspMargin = nonMspRate > 0 ? ((nonMspRate - burdened) / nonMspRate) * 100 : 0;
+                    const ahMargin = ahRate > 0 ? ((ahRate - burdened) / ahRate) * 100 : 0;
                     return (
                       <tr key={k}>
                         <td><strong>{k}</strong></td>
                         <td><input type="text" value={r.title} onChange={(e) => updateRate(k, 'title', e.target.value)} style={{ width: 150 }} /></td>
                         <td><select value={r.serviceType} onChange={(e) => updateRate(k, 'serviceType', e.target.value)}>{SERVICE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
-                        <td><input type="number" min="0" step="0.01" value={r.baseCost} onChange={(e) => updateRate(k, 'baseCost', e.target.value)} style={{ width: 70 }} /></td>
-                        <td><input type="number" min="0" value={r.burdenPercent} onChange={(e) => updateRate(k, 'burdenPercent', e.target.value)} style={{ width: 50 }} /></td>
-                        <td><input type="number" min="0" value={r.mspPrice} onChange={(e) => updateRate(k, 'mspPrice', e.target.value)} style={{ width: 70 }} /></td>
-                        <td><input type="number" min="0" value={r.nonMspPrice} onChange={(e) => updateRate(k, 'nonMspPrice', e.target.value)} style={{ width: 70 }} /></td>
-                        <td><input type="number" min="0" value={r.afterHoursPercent} onChange={(e) => updateRate(k, 'afterHoursPercent', e.target.value)} style={{ width: 50 }} /></td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            value={salary}
+                            onChange={(e) => handleSalaryChange(k, e.target.value)}
+                            style={{ width: 110 }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={r.baseCost}
+                            onChange={(e) => updateRate(k, 'baseCost', e.target.value)}
+                            style={{ width: 80 }}
+                          />
+                        </td>
+                        <td><input type="number" min="0" value={r.burdenPercent} onChange={(e) => updateRate(k, 'burdenPercent', e.target.value)} style={{ width: 60 }} /></td>
+                        <td className="currency">{formatCurrency(burdened)}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={r.mspPrice}
+                            onChange={(e) => updateRate(k, 'mspPrice', e.target.value)}
+                            style={{ width: 80 }}
+                          />
+                          <div style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 2 }}>
+                            GM: {mspRate > 0 ? formatPercent(mspMargin) : '—'}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={r.nonMspPrice}
+                            onChange={(e) => updateRate(k, 'nonMspPrice', e.target.value)}
+                            style={{ width: 80 }}
+                          />
+                          <div style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 2 }}>
+                            GM: {nonMspRate > 0 ? formatPercent(nonMspMargin) : '—'}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={r.afterHoursPercent}
+                            onChange={(e) => updateRate(k, 'afterHoursPercent', e.target.value)}
+                            style={{ width: 60 }}
+                          />
+                          <div style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 2 }}>
+                            AH Rate: {ahRate > 0 ? formatCurrency(ahRate) : '—'} ({ahRate > 0 ? formatPercent(ahMargin) : '—'} GM)
+                          </div>
+                        </td>
                         <td style={{ fontSize: '0.8rem', color: '#6c757d' }}>
                           {showSuggestions && suggested
                             ? <span>{formatCurrency(suggested)} / hr @ {targetMargin.toFixed(1)}% GM</span>
@@ -2121,12 +2343,24 @@
     }
     
     // Preview SOW Tab
-    function PreviewSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, grossProfit, grossMargin, upfrontAmount, signoffAmount }) {
+    function PreviewSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, grossProfit, grossMargin, upfrontAmount, signoffAmount, serviceItems }) {
+      const [showDetails, setShowDetails] = useState(false);
       return (
         <div>
           <div className="warning-banner">INTERNAL PREVIEW ONLY</div>
           <div className="preview-document">
             <div className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'} | <strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()} | <strong>Type:</strong> {coverData.engagementType}</p></div>
+            <div style={{ margin: '10px 0', textAlign: 'right', fontSize: '0.85rem' }}>
+              <label style={{ cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showDetails}
+                  onChange={(e) => setShowDetails(e.target.checked)}
+                  style={{ marginRight: 6 }}
+                />
+                Show detailed phases / tasks / steps
+              </label>
+            </div>
             <h3>Phase Summary</h3>
             <table className="preview-table">
               <thead><tr><th>Phase</th><th>Hours</th><th>Amount</th></tr></thead>
@@ -2154,6 +2388,51 @@
             <div style={{ marginTop: 20, padding: 12, background: '#f8f9fa', borderRadius: 6 }}>
               <strong>Internal:</strong> Profit: {formatCurrency(grossProfit)} | Margin: {formatPercent(grossMargin)}
             </div>
+            {showDetails && (
+              <>
+                <h3 style={{ marginTop: 24 }}>Detailed Phases, Tasks & Steps</h3>
+                {serviceItems && serviceItems.length > 0 ? (
+                  serviceItems.map(phase => (
+                    <div key={phase.id} style={{ marginBottom: 16 }}>
+                      <h4 style={{ marginBottom: 6 }}>{phase.phase}</h4>
+                      {phase.subItems && phase.subItems.length > 0 ? (
+                        <table className="preview-table">
+                          <thead>
+                            <tr>
+                              <th>Description</th>
+                              <th>Resource</th>
+                              <th>Hours</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {phase.subItems.map(item => (
+                              <React.Fragment key={item.id}>
+                                <tr>
+                                  <td>{item.description}</td>
+                                  <td>{item.resourceClass}</td>
+                                  <td className="number">{item.hours}</td>
+                                </tr>
+                                {item.detailSteps && item.detailSteps.trim() !== '' && (
+                                  <tr>
+                                    <td colSpan={3} style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', color: '#555' }}>
+                                      {item.detailSteps}
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p style={{ fontSize: '0.8rem', color: '#6c757d' }}>No tasks defined for this phase.</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ fontSize: '0.85rem', color: '#6c757d' }}>No services defined yet.</p>
+                )}
+              </>
+            )}
           </div>
         </div>
       );
