@@ -813,12 +813,13 @@
       
       // Scope data
       const [scopeData, setScopeData] = useState({
-        scopeDescription: '', deliverables: ['', '', '', ''], timeline: '',
+        scopeDescription: '', deliverables: ['', '', '', ''], nonDeliverables: ['', '', ''], acceptanceCriteria: '', timeline: '',
         maintenanceWindows: 0, maintenanceWindowTime: '', estimatedOutageHours: 0, variablesUnknowns: '',
       });
       
       // Client SOW display toggles
       const [clientToggles, setClientToggles] = useState({
+        showExecutiveSummary: true, showDeliverables: true, showNonDeliverables: true, showAcceptanceCriteria: true,
         showPhases: true, showPhaseHours: true, showPhasePrices: true,
         showTimeline: true, showMaintenanceWindows: true, showOutageHours: true, showPaymentTerms: true,
       });
@@ -1918,6 +1919,13 @@
             {data.deliverables.map((item, idx) => <div className="form-group" key={idx}><label>Deliverable {idx + 1}</label><input type="text" value={item} onChange={(e) => { const d = [...data.deliverables]; d[idx] = e.target.value; setData(prev => ({ ...prev, deliverables: d })); }} placeholder="Enter deliverable..." /></div>)}
           </div>
           <button className="add-row-btn" onClick={() => setData(prev => ({ ...prev, deliverables: [...prev.deliverables, ''] }))}>+ Add Deliverable</button>
+          <div className="subsection-title">Non-Deliverables / Exclusions</div>
+          <div className="form-grid">
+            {(data.nonDeliverables || []).map((item, idx) => <div className="form-group" key={idx}><label>Exclusion {idx + 1}</label><input type="text" value={item} onChange={(e) => { const d = [...(data.nonDeliverables || [])]; d[idx] = e.target.value; setData(prev => ({ ...prev, nonDeliverables: d })); }} placeholder="Enter non-deliverable / exclusion..." /></div>)}
+          </div>
+          <button className="add-row-btn" onClick={() => setData(prev => ({ ...prev, nonDeliverables: [...(prev.nonDeliverables || []), ''] }))}>+ Add Non-Deliverable</button>
+          <div className="subsection-title">Acceptance Criteria</div>
+          <div className="form-group" style={{ marginBottom: 20 }}><label>Acceptance Criteria</label><textarea rows={4} value={data.acceptanceCriteria || ''} onChange={(e) => setData(prev => ({ ...prev, acceptanceCriteria: e.target.value }))} placeholder="• Criteria for project sign-off&#10;• Conditions that must be met&#10;• Quality standards..." /></div>
           <div className="subsection-title">Timeline & Maintenance</div>
           <div className="summary-cards">
             <div className="summary-card"><div className="summary-card-label">Total Hours</div><div className="summary-card-value">{totalHours}</div></div>
@@ -2611,26 +2619,49 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'letter');
         const el = document.getElementById('clientSOWDoc');
-        const canvas = await html2canvas(el, { scale: 2, useCORS: true });
-        const img = canvas.toDataURL('image/png');
-
+        const sections = el.querySelectorAll('[data-pdf-section]');
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 10;
-        const imgWidth = pageWidth - margin * 2;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const usableWidth = pageWidth - margin * 2;
+        const usableHeight = pageHeight - margin * 2;
+        let yPos = margin;
 
-        let heightLeft = imgHeight;
-        let position = margin;
+        for (let i = 0; i < sections.length; i++) {
+          const section = sections[i];
+          if (section.offsetHeight < 2) continue;
+          const canvas = await html2canvas(section, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          const imgWidth = usableWidth;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        doc.addImage(img, 'PNG', margin, position, imgWidth, imgHeight);
-        heightLeft -= (pageHeight - margin * 2);
-
-        while (heightLeft > 0) {
-          doc.addPage();
-          position = heightLeft - imgHeight + margin;
-          doc.addImage(img, 'PNG', margin, position, imgWidth, imgHeight);
-          heightLeft -= (pageHeight - margin * 2);
+          if (imgHeight <= usableHeight) {
+            if (yPos + imgHeight > pageHeight - margin) {
+              doc.addPage();
+              yPos = margin;
+            }
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, yPos, imgWidth, imgHeight);
+            yPos += imgHeight + 2;
+          } else {
+            if (yPos > margin + 1) { doc.addPage(); yPos = margin; }
+            const pxPerMM = canvas.width / usableWidth;
+            let srcY = 0;
+            while (srcY < canvas.height) {
+              const chunkPx = Math.min(Math.ceil(usableHeight * pxPerMM), canvas.height - srcY);
+              const chunkMM = chunkPx / pxPerMM;
+              const chunkCanvas = document.createElement('canvas');
+              chunkCanvas.width = canvas.width;
+              chunkCanvas.height = chunkPx;
+              chunkCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, chunkPx, 0, 0, canvas.width, chunkPx);
+              doc.addImage(chunkCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgWidth, chunkMM);
+              srcY += chunkPx;
+              if (srcY < canvas.height) {
+                doc.addPage();
+                yPos = margin;
+              } else {
+                yPos = margin + chunkMM + 2;
+              }
+            }
+          }
         }
 
         doc.save(`SAX_MA_SOW_${coverData.projectName || 'Project'}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -2640,6 +2671,10 @@
           <div className="toggle-panel">
             <h4>📋 Display Options</h4>
             <div className="toggle-grid">
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showExecutiveSummary} onChange={(e) => setClientToggles(prev => ({ ...prev, showExecutiveSummary: e.target.checked }))} /><label>Executive Summary</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showDeliverables} onChange={(e) => setClientToggles(prev => ({ ...prev, showDeliverables: e.target.checked }))} /><label>Deliverables</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showNonDeliverables} onChange={(e) => setClientToggles(prev => ({ ...prev, showNonDeliverables: e.target.checked }))} /><label>Non-Deliverables</label></div>
+              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showAcceptanceCriteria} onChange={(e) => setClientToggles(prev => ({ ...prev, showAcceptanceCriteria: e.target.checked }))} /><label>Acceptance Criteria</label></div>
               <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhases} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhases: e.target.checked }))} /><label>Phases</label></div>
               <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhaseHours} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhaseHours: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Hours</label></div>
               <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhasePrices} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhasePrices: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Prices</label></div>
@@ -2651,48 +2686,93 @@
           </div>
           <div style={{ marginBottom: 15, textAlign: 'right' }}><button className="btn btn-primary" onClick={exportPDF}>📄 Export PDF</button></div>
           <div className="preview-document" id="clientSOWDoc">
-            <div className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'}</p><p><strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p></div>
+            <div data-pdf-section="header" className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'}</p><p><strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p></div>
+            {clientToggles.showExecutiveSummary && scopeData.scopeDescription && (
+              <div data-pdf-section="summary" style={{ marginBottom: 20 }}>
+                <h3>Executive Summary</h3>
+                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.scopeDescription}</p>
+              </div>
+            )}
+            {clientToggles.showDeliverables && scopeData.deliverables && scopeData.deliverables.filter(d => d && d.trim()).length > 0 && (
+              <div data-pdf-section="deliverables" style={{ marginBottom: 20 }}>
+                <h3>Scope of Work — Deliverables</h3>
+                <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
+                  {scopeData.deliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
+                </ul>
+              </div>
+            )}
+            {clientToggles.showNonDeliverables && scopeData.nonDeliverables && scopeData.nonDeliverables.filter(d => d && d.trim()).length > 0 && (
+              <div data-pdf-section="non-deliverables" style={{ marginBottom: 20 }}>
+                <h3>Exclusions / Non-Deliverables</h3>
+                <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
+                  {scopeData.nonDeliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
+                </ul>
+              </div>
+            )}
+            {clientToggles.showAcceptanceCriteria && scopeData.acceptanceCriteria && (
+              <div data-pdf-section="acceptance" style={{ marginBottom: 20 }}>
+                <h3>Acceptance Criteria</h3>
+                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.acceptanceCriteria}</p>
+              </div>
+            )}
             {clientToggles.showPhases && (
-              <><h3>Project Phases</h3>
-              <table className="preview-table">
-                <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
-                <tbody>
-                  {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td>{clientToggles.showPhaseHours && <td>{p.hours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(p.cost)}</td>}</tr>)}
-                  <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}><td>Total</td>{clientToggles.showPhaseHours && <td>{totalHours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(laborRevenue)}</td>}</tr>
-                </tbody>
-              </table></>
+              <div data-pdf-section="phases" style={{ marginBottom: 20 }}>
+                <h3>Project Phases</h3>
+                <table className="preview-table">
+                  <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
+                  <tbody>
+                    {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td>{clientToggles.showPhaseHours && <td>{p.hours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(p.cost)}</td>}</tr>)}
+                    <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}><td>Total</td>{clientToggles.showPhaseHours && <td>{totalHours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(laborRevenue)}</td>}</tr>
+                  </tbody>
+                </table>
+              </div>
             )}
-            {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
-            {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
-              <><h3>Maintenance Requirements</h3>
-              {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
-              {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
-              {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
+            {(clientToggles.showTimeline || ((clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0)) && (
+              <div data-pdf-section="timeline" style={{ marginBottom: 20 }}>
+                {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
+                {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
+                  <><h3>Maintenance Requirements</h3>
+                  {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
+                  {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
+                  {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
+                )}
+              </div>
             )}
-            <h3>Investment Summary</h3>
-            <div className="payment-summary">
-              <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
-              {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
-              {totalBillableExpenses > 0 && <div className="payment-row"><span>Expenses (est.)</span><span>{formatCurrency(totalBillableExpenses)}</span></div>}
-              <div className="payment-row total"><span>TOTAL INVESTMENT</span><span>{formatCurrency(grandTotalRevenue)}</span></div>
+            <div data-pdf-section="investment" style={{ marginBottom: 20 }}>
+              <h3>Investment Summary</h3>
+              <div className="payment-summary">
+                <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
+                {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
+                {totalBillableExpenses > 0 && <div className="payment-row"><span>Expenses (est.)</span><span>{formatCurrency(totalBillableExpenses)}</span></div>}
+                <div className="payment-row total"><span>TOTAL INVESTMENT</span><span>{formatCurrency(grandTotalRevenue)}</span></div>
+              </div>
             </div>
             {clientToggles.showPaymentTerms && (
-              <><h3>Payment Terms</h3>
-              <table className="preview-table">
-                <tbody>
-                  <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
-                  <tr><td>Due Upon Completion ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
-                </tbody>
-              </table></>
+              <div data-pdf-section="payment" style={{ marginBottom: 20 }}>
+                <h3>Payment Terms</h3>
+                <table className="preview-table">
+                  <tbody>
+                    <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
+                    <tr><td>Due Upon Completion ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
             )}
-            {coverData.engagementType === 'Fixed Fee' && (
-              <div className="fixed-fee-notice"><strong>Fixed Fee:</strong> Total investment of {formatCurrency(grandTotalRevenue)} shall <strong>not exceed</strong> this amount unless a Change Order is mutually agreed upon in writing.</div>
+            <div data-pdf-section="terms" style={{ marginBottom: 20 }}>
+              {coverData.engagementType === 'Fixed Fee' && (
+                <div className="fixed-fee-notice"><strong>Fixed Fee:</strong> Total investment of {formatCurrency(grandTotalRevenue)} shall <strong>not exceed</strong> this amount unless a Change Order is mutually agreed upon in writing.</div>
+              )}
+              {coverData.engagementType === 'T&M' && (
+                <div className="tm-notice"><strong>Time & Materials:</strong> Billed on actual time/materials.{coverData.tAndMNotToExceed > 0 && <> Not to exceed <strong>{formatCurrency(coverData.tAndMNotToExceed)}</strong> without approval.</>}<br /><br /><strong>Status:</strong> At {coverData.tAndMStatusThreshold}% of budget, SAX will provide status update.</div>
+              )}
+            </div>
+            {scopeData.variablesUnknowns && (
+              <div data-pdf-section="assumptions" style={{ marginBottom: 20 }}>
+                <h3>Assumptions</h3>
+                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p>
+              </div>
             )}
-            {coverData.engagementType === 'T&M' && (
-              <div className="tm-notice"><strong>Time & Materials:</strong> Billed on actual time/materials.{coverData.tAndMNotToExceed > 0 && <> Not to exceed <strong>{formatCurrency(coverData.tAndMNotToExceed)}</strong> without approval.</>}<br /><br /><strong>Status:</strong> At {coverData.tAndMStatusThreshold}% of budget, SAX will provide status update.</div>
-            )}
-            {scopeData.variablesUnknowns && <><h3>Assumptions</h3><p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p></>}
-            <div className="signature-section">
+            <div data-pdf-section="signature" className="signature-section">
               <h3>Authorization</h3>
               <p style={{ fontSize: '0.9em' }}>By signing, parties authorize work under these terms.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 20 }}>
