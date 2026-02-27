@@ -799,6 +799,30 @@
       ]},
     ];
     
+    const DEFAULT_CLIENT_SECTION_ORDER = [
+      'summary', 'deliverables', 'non-deliverables', 'acceptance',
+      'phases', 'timeline', 'investment', 'payment', 'terms', 'assumptions', 'signature'
+    ];
+    const SECTION_META = {
+      summary: { label: 'Executive Summary', toggleKey: 'showExecutiveSummary' },
+      deliverables: { label: 'Deliverables', toggleKey: 'showDeliverables' },
+      'non-deliverables': { label: 'Non-Deliverables', toggleKey: 'showNonDeliverables' },
+      acceptance: { label: 'Acceptance Criteria', toggleKey: 'showAcceptanceCriteria' },
+      phases: { label: 'Project Phases', toggleKey: 'showPhases', subToggles: [
+        { key: 'showPhaseHours', label: 'Hours' },
+        { key: 'showPhasePrices', label: 'Prices' },
+      ]},
+      timeline: { label: 'Timeline & Maintenance', toggleKey: 'showTimeline', subToggles: [
+        { key: 'showMaintenanceWindows', label: 'Maint.' },
+        { key: 'showOutageHours', label: 'Outage' },
+      ]},
+      investment: { label: 'Investment Summary' },
+      payment: { label: 'Payment Terms', toggleKey: 'showPaymentTerms' },
+      terms: { label: 'Terms & Conditions' },
+      assumptions: { label: 'Assumptions' },
+      signature: { label: 'Authorization' },
+    };
+
     // Main App
     function App() {
       const [activeTab, setActiveTab] = useState('cover');
@@ -823,6 +847,9 @@
         showPhases: true, showPhaseHours: true, showPhasePrices: true,
         showTimeline: true, showMaintenanceWindows: true, showOutageHours: true, showPaymentTerms: true,
       });
+      
+      // Client SOW section order
+      const [clientSectionOrder, setClientSectionOrder] = useState(DEFAULT_CLIENT_SECTION_ORDER);
       
       // Rates & Constants
       const [rates, setRates] = useState(initialRates);
@@ -1082,6 +1109,7 @@
           nonBillableExpenses,
           billableTools,
           clientToggles,
+          clientSectionOrder,
           totals: {
             totalHours,
             laborRevenue,
@@ -1109,6 +1137,7 @@
           nonBillableExpenses,
           billableTools,
           clientToggles,
+          clientSectionOrder,
           totalHours,
           laborRevenue,
           productsTotal,
@@ -1193,6 +1222,7 @@
           if (full.nonBillableExpenses) setNonBillableExpenses(full.nonBillableExpenses);
           if (Array.isArray(full.billableTools)) setBillableTools(full.billableTools);
           if (full.clientToggles) setClientToggles(full.clientToggles);
+          if (Array.isArray(full.clientSectionOrder)) setClientSectionOrder(full.clientSectionOrder);
           if (full.saxSignatureData) setSaxSignatureData(full.saxSignatureData);
           if (full.saxSignerName) setSaxSignerName(full.saxSignerName);
           if (full.saxSignerTitle) setSaxSignerTitle(full.saxSignerTitle);
@@ -1760,7 +1790,7 @@
           <div className={`container ${activeTab === 'client' ? 'active' : ''}`}>
             <div className="header"><span className="robot-icon">✍️</span><h1>Client SOW</h1><p>Client-Facing Statement of Work</p></div>
             <div className="content-area">
-              <ClientSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} estimatedWeeks={estimatedWeeks} clientToggles={clientToggles} setClientToggles={setClientToggles} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} maintenanceWindowsNeeded={maintenanceWindowsNeeded} totalOutageHours={totalOutageHours} saxSignatureData={saxSignatureData} saxSignerName={saxSignerName} saxSignerTitle={saxSignerTitle} />
+              <ClientSOWTab coverData={coverData} scopeData={scopeData} phaseTotals={phaseTotals} totalHours={totalHours} laborRevenue={laborRevenue} productsTotal={productsTotal} productsInstallLabor={productsInstallLabor} totalBillableExpenses={totalBillableExpenses} grandTotalRevenue={grandTotalRevenue} estimatedWeeks={estimatedWeeks} clientToggles={clientToggles} setClientToggles={setClientToggles} clientSectionOrder={clientSectionOrder} setClientSectionOrder={setClientSectionOrder} upfrontAmount={upfrontAmount} signoffAmount={signoffAmount} maintenanceWindowsNeeded={maintenanceWindowsNeeded} totalOutageHours={totalOutageHours} saxSignatureData={saxSignatureData} saxSignerName={saxSignerName} saxSignerTitle={saxSignerTitle} />
             </div>
           </div>
 
@@ -2607,7 +2637,7 @@
     }
     
     // Client SOW Tab
-    function ClientSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, estimatedWeeks, clientToggles, setClientToggles, upfrontAmount, signoffAmount, maintenanceWindowsNeeded, totalOutageHours, saxSignatureData, saxSignerName, saxSignerTitle }) {
+    function ClientSOWTab({ coverData, scopeData, phaseTotals, totalHours, laborRevenue, productsTotal, productsInstallLabor, totalBillableExpenses, grandTotalRevenue, estimatedWeeks, clientToggles, setClientToggles, clientSectionOrder, setClientSectionOrder, upfrontAmount, signoffAmount, maintenanceWindowsNeeded, totalOutageHours, saxSignatureData, saxSignerName, saxSignerTitle }) {
       const canvasRef = useRef(null);
       const [drawing, setDrawing] = useState(false);
       useEffect(() => { const c = canvasRef.current; if (c) { const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); } }, []);
@@ -2615,6 +2645,131 @@
       const draw = (e) => { if (!drawing) return; const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.lineTo(e.clientX - r.left, e.clientY - r.top); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke(); };
       const stopDraw = () => setDrawing(false);
       const clearSig = () => { const c = canvasRef.current; const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); };
+      const moveSection = (idx, dir) => {
+        setClientSectionOrder(prev => {
+          const arr = [...prev];
+          const to = idx + dir;
+          if (to < 0 || to >= arr.length) return prev;
+          [arr[idx], arr[to]] = [arr[to], arr[idx]];
+          return arr;
+        });
+      };
+      const sectionRenderers = {
+        summary: () => clientToggles.showExecutiveSummary && scopeData.scopeDescription && (
+          <div data-pdf-section="summary" style={{ marginBottom: 20 }}>
+            <h3>Executive Summary</h3>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.scopeDescription}</p>
+          </div>
+        ),
+        deliverables: () => clientToggles.showDeliverables && scopeData.deliverables && scopeData.deliverables.filter(d => d && d.trim()).length > 0 && (
+          <div data-pdf-section="deliverables" style={{ marginBottom: 20 }}>
+            <h3>Scope of Work \u2014 Deliverables</h3>
+            <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
+              {scopeData.deliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
+            </ul>
+          </div>
+        ),
+        'non-deliverables': () => clientToggles.showNonDeliverables && scopeData.nonDeliverables && scopeData.nonDeliverables.filter(d => d && d.trim()).length > 0 && (
+          <div data-pdf-section="non-deliverables" style={{ marginBottom: 20 }}>
+            <h3>Exclusions / Non-Deliverables</h3>
+            <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
+              {scopeData.nonDeliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
+            </ul>
+          </div>
+        ),
+        acceptance: () => clientToggles.showAcceptanceCriteria && scopeData.acceptanceCriteria && (
+          <div data-pdf-section="acceptance" style={{ marginBottom: 20 }}>
+            <h3>Acceptance Criteria</h3>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.acceptanceCriteria}</p>
+          </div>
+        ),
+        phases: () => clientToggles.showPhases && (
+          <div data-pdf-section="phases" style={{ marginBottom: 20 }}>
+            <h3>Project Phases</h3>
+            <table className="preview-table">
+              <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
+              <tbody>
+                {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td>{clientToggles.showPhaseHours && <td>{p.hours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(p.cost)}</td>}</tr>)}
+                <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}><td>Total</td>{clientToggles.showPhaseHours && <td>{totalHours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(laborRevenue)}</td>}</tr>
+              </tbody>
+            </table>
+          </div>
+        ),
+        timeline: () => (clientToggles.showTimeline || ((clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0)) && (
+          <div data-pdf-section="timeline" style={{ marginBottom: 20 }}>
+            {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
+            {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
+              <><h3>Maintenance Requirements</h3>
+              {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
+              {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
+              {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
+            )}
+          </div>
+        ),
+        investment: () => (
+          <div data-pdf-section="investment" style={{ marginBottom: 20 }}>
+            <h3>Investment Summary</h3>
+            <div className="payment-summary">
+              <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
+              {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
+              {totalBillableExpenses > 0 && <div className="payment-row"><span>Expenses (est.)</span><span>{formatCurrency(totalBillableExpenses)}</span></div>}
+              <div className="payment-row total"><span>TOTAL INVESTMENT</span><span>{formatCurrency(grandTotalRevenue)}</span></div>
+            </div>
+          </div>
+        ),
+        payment: () => clientToggles.showPaymentTerms && (
+          <div data-pdf-section="payment" style={{ marginBottom: 20 }}>
+            <h3>Payment Terms</h3>
+            <table className="preview-table">
+              <tbody>
+                <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
+                <tr><td>Due Upon Completion ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        ),
+        terms: () => (
+          <div data-pdf-section="terms" style={{ marginBottom: 20 }}>
+            {coverData.engagementType === 'Fixed Fee' && (
+              <div className="fixed-fee-notice"><strong>Fixed Fee:</strong> Total investment of {formatCurrency(grandTotalRevenue)} shall <strong>not exceed</strong> this amount unless a Change Order is mutually agreed upon in writing.</div>
+            )}
+            {coverData.engagementType === 'T&M' && (
+              <div className="tm-notice"><strong>Time & Materials:</strong> Billed on actual time/materials.{coverData.tAndMNotToExceed > 0 && <> Not to exceed <strong>{formatCurrency(coverData.tAndMNotToExceed)}</strong> without approval.</>}<br /><br /><strong>Status:</strong> At {coverData.tAndMStatusThreshold}% of budget, SAX will provide status update.</div>
+            )}
+          </div>
+        ),
+        assumptions: () => scopeData.variablesUnknowns && (
+          <div data-pdf-section="assumptions" style={{ marginBottom: 20 }}>
+            <h3>Assumptions</h3>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p>
+          </div>
+        ),
+        signature: () => (
+          <div data-pdf-section="signature" className="signature-section">
+            <h3>Authorization</h3>
+            <p style={{ fontSize: '0.9em' }}>By signing, parties authorize work under these terms.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 20 }}>
+              <div>
+                <p><strong>CLIENT</strong></p>
+                <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
+                <canvas ref={canvasRef} width={300} height={60} className="signature-box" onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw} />
+                <button className="btn btn-secondary" onClick={clearSig} style={{ marginTop: 5, padding: '4px 10px', fontSize: '0.75em' }}>Clear</button>
+                <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: ___________________________</p>
+                <p style={{ fontSize: '0.85em' }}>Title: ___________________________</p>
+                <p style={{ fontSize: '0.85em' }}>Date: ___________________________</p>
+              </div>
+              <div>
+                <p><strong>SAX TECHNOLOGY</strong></p>
+                <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
+                {saxSignatureData ? <img src={saxSignatureData} alt="SAX Sig" style={{ border: '1px solid #9ca3af', borderRadius: 4, height: 60, background: '#f9fafb' }} /> : <div className="signature-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.75em' }}>[Set in Config]</div>}
+                <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: {saxSignerName || '___________________________'}</p>
+                <p style={{ fontSize: '0.85em' }}>Title: {saxSignerTitle || '___________________________'}</p>
+                <p style={{ fontSize: '0.85em' }}>Date: {new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+        ),
+      };
       const exportPDF = async () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'letter');
@@ -2640,7 +2795,7 @@
               yPos = margin;
             }
             doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, yPos, imgWidth, imgHeight);
-            yPos += imgHeight + 2;
+            yPos += imgHeight + 4;
           } else {
             if (yPos > margin + 1) { doc.addPage(); yPos = margin; }
             const pxPerMM = canvas.width / usableWidth;
@@ -2669,132 +2824,42 @@
       return (
         <div>
           <div className="toggle-panel">
-            <h4>📋 Display Options</h4>
-            <div className="toggle-grid">
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showExecutiveSummary} onChange={(e) => setClientToggles(prev => ({ ...prev, showExecutiveSummary: e.target.checked }))} /><label>Executive Summary</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showDeliverables} onChange={(e) => setClientToggles(prev => ({ ...prev, showDeliverables: e.target.checked }))} /><label>Deliverables</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showNonDeliverables} onChange={(e) => setClientToggles(prev => ({ ...prev, showNonDeliverables: e.target.checked }))} /><label>Non-Deliverables</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showAcceptanceCriteria} onChange={(e) => setClientToggles(prev => ({ ...prev, showAcceptanceCriteria: e.target.checked }))} /><label>Acceptance Criteria</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhases} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhases: e.target.checked }))} /><label>Phases</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhaseHours} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhaseHours: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Hours</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPhasePrices} onChange={(e) => setClientToggles(prev => ({ ...prev, showPhasePrices: e.target.checked }))} disabled={!clientToggles.showPhases} /><label>Phase Prices</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showTimeline} onChange={(e) => setClientToggles(prev => ({ ...prev, showTimeline: e.target.checked }))} /><label>Timeline</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showMaintenanceWindows} onChange={(e) => setClientToggles(prev => ({ ...prev, showMaintenanceWindows: e.target.checked }))} /><label>Maint. Windows</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showOutageHours} onChange={(e) => setClientToggles(prev => ({ ...prev, showOutageHours: e.target.checked }))} /><label>Outage Hours</label></div>
-              <div className="toggle-item"><input type="checkbox" checked={clientToggles.showPaymentTerms} onChange={(e) => setClientToggles(prev => ({ ...prev, showPaymentTerms: e.target.checked }))} /><label>Payment Terms</label></div>
+            <h4>📋 Section Order & Display</h4>
+            <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 10 }}>Use ▲ ▼ to reorder sections. Toggle visibility with checkboxes.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {clientSectionOrder.map((key, idx) => {
+                const meta = SECTION_META[key];
+                if (!meta) return null;
+                const isEnabled = !meta.toggleKey || clientToggles[meta.toggleKey] !== false;
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: isEnabled ? '#fff' : '#f0f0f0', borderRadius: 6, border: '1px solid #dee2e6', opacity: isEnabled ? 1 : 0.5 }}>
+                    {meta.toggleKey ? (
+                      <input type="checkbox" checked={!!clientToggles[meta.toggleKey]} onChange={(e) => setClientToggles(prev => ({ ...prev, [meta.toggleKey]: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                    ) : (
+                      <span style={{ width: 16, textAlign: 'center', fontSize: '0.7rem', color: '#6c757d' }}>{"\u25CF"}</span>
+                    )}
+                    <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 500, color: '#2d3436' }}>{meta.label}</span>
+                    {meta.subToggles && isEnabled && (
+                      <span style={{ display: 'flex', gap: 8 }}>
+                        {meta.subToggles.map(sub => (
+                          <label key={sub.key} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '0.75rem', color: '#6c757d', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={!!clientToggles[sub.key]} onChange={(e) => setClientToggles(prev => ({ ...prev, [sub.key]: e.target.checked }))} style={{ width: 13, height: 13 }} />
+                            {sub.label}
+                          </label>
+                        ))}
+                      </span>
+                    )}
+                    <button onClick={() => moveSection(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: '1px solid #ced4da', borderRadius: 4, padding: '2px 8px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '0.8rem' }}>{"\u25B2"}</button>
+                    <button onClick={() => moveSection(idx, 1)} disabled={idx === clientSectionOrder.length - 1} style={{ background: 'none', border: '1px solid #ced4da', borderRadius: 4, padding: '2px 8px', cursor: idx === clientSectionOrder.length - 1 ? 'default' : 'pointer', opacity: idx === clientSectionOrder.length - 1 ? 0.3 : 1, fontSize: '0.8rem' }}>{"\u25BC"}</button>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div style={{ marginBottom: 15, textAlign: 'right' }}><button className="btn btn-primary" onClick={exportPDF}>📄 Export PDF</button></div>
           <div className="preview-document" id="clientSOWDoc">
             <div data-pdf-section="header" className="preview-header"><h1>SAX Technology Advisors</h1><h2>M&A Statement of Work</h2><p><strong>Project:</strong> {coverData.projectName || 'TBD'}</p><p><strong>Client:</strong> {coverData.customerId || 'TBD'}</p><p><strong>Date:</strong> {new Date().toLocaleDateString()}</p></div>
-            {clientToggles.showExecutiveSummary && scopeData.scopeDescription && (
-              <div data-pdf-section="summary" style={{ marginBottom: 20 }}>
-                <h3>Executive Summary</h3>
-                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.scopeDescription}</p>
-              </div>
-            )}
-            {clientToggles.showDeliverables && scopeData.deliverables && scopeData.deliverables.filter(d => d && d.trim()).length > 0 && (
-              <div data-pdf-section="deliverables" style={{ marginBottom: 20 }}>
-                <h3>Scope of Work — Deliverables</h3>
-                <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
-                  {scopeData.deliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
-                </ul>
-              </div>
-            )}
-            {clientToggles.showNonDeliverables && scopeData.nonDeliverables && scopeData.nonDeliverables.filter(d => d && d.trim()).length > 0 && (
-              <div data-pdf-section="non-deliverables" style={{ marginBottom: 20 }}>
-                <h3>Exclusions / Non-Deliverables</h3>
-                <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
-                  {scopeData.nonDeliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
-                </ul>
-              </div>
-            )}
-            {clientToggles.showAcceptanceCriteria && scopeData.acceptanceCriteria && (
-              <div data-pdf-section="acceptance" style={{ marginBottom: 20 }}>
-                <h3>Acceptance Criteria</h3>
-                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.acceptanceCriteria}</p>
-              </div>
-            )}
-            {clientToggles.showPhases && (
-              <div data-pdf-section="phases" style={{ marginBottom: 20 }}>
-                <h3>Project Phases</h3>
-                <table className="preview-table">
-                  <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
-                  <tbody>
-                    {phaseTotals.filter(p => p.hours > 0).map(p => <tr key={p.id}><td>{p.name}</td>{clientToggles.showPhaseHours && <td>{p.hours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(p.cost)}</td>}</tr>)}
-                    <tr style={{ background: '#f8f9fa', fontWeight: 'bold' }}><td>Total</td>{clientToggles.showPhaseHours && <td>{totalHours}</td>}{clientToggles.showPhasePrices && <td>{formatCurrency(laborRevenue)}</td>}</tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {(clientToggles.showTimeline || ((clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0)) && (
-              <div data-pdf-section="timeline" style={{ marginBottom: 20 }}>
-                {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
-                {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
-                  <><h3>Maintenance Requirements</h3>
-                  {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
-                  {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
-                  {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
-                )}
-              </div>
-            )}
-            <div data-pdf-section="investment" style={{ marginBottom: 20 }}>
-              <h3>Investment Summary</h3>
-              <div className="payment-summary">
-                <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
-                {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
-                {totalBillableExpenses > 0 && <div className="payment-row"><span>Expenses (est.)</span><span>{formatCurrency(totalBillableExpenses)}</span></div>}
-                <div className="payment-row total"><span>TOTAL INVESTMENT</span><span>{formatCurrency(grandTotalRevenue)}</span></div>
-              </div>
-            </div>
-            {clientToggles.showPaymentTerms && (
-              <div data-pdf-section="payment" style={{ marginBottom: 20 }}>
-                <h3>Payment Terms</h3>
-                <table className="preview-table">
-                  <tbody>
-                    <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
-                    <tr><td>Due Upon Completion ({coverData.signoffPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(signoffAmount)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div data-pdf-section="terms" style={{ marginBottom: 20 }}>
-              {coverData.engagementType === 'Fixed Fee' && (
-                <div className="fixed-fee-notice"><strong>Fixed Fee:</strong> Total investment of {formatCurrency(grandTotalRevenue)} shall <strong>not exceed</strong> this amount unless a Change Order is mutually agreed upon in writing.</div>
-              )}
-              {coverData.engagementType === 'T&M' && (
-                <div className="tm-notice"><strong>Time & Materials:</strong> Billed on actual time/materials.{coverData.tAndMNotToExceed > 0 && <> Not to exceed <strong>{formatCurrency(coverData.tAndMNotToExceed)}</strong> without approval.</>}<br /><br /><strong>Status:</strong> At {coverData.tAndMStatusThreshold}% of budget, SAX will provide status update.</div>
-              )}
-            </div>
-            {scopeData.variablesUnknowns && (
-              <div data-pdf-section="assumptions" style={{ marginBottom: 20 }}>
-                <h3>Assumptions</h3>
-                <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p>
-              </div>
-            )}
-            <div data-pdf-section="signature" className="signature-section">
-              <h3>Authorization</h3>
-              <p style={{ fontSize: '0.9em' }}>By signing, parties authorize work under these terms.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 20 }}>
-                <div>
-                  <p><strong>CLIENT</strong></p>
-                  <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
-                  <canvas ref={canvasRef} width={300} height={60} className="signature-box" onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw} />
-                  <button className="btn btn-secondary" onClick={clearSig} style={{ marginTop: 5, padding: '4px 10px', fontSize: '0.75em' }}>Clear</button>
-                  <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: ___________________________</p>
-                  <p style={{ fontSize: '0.85em' }}>Title: ___________________________</p>
-                  <p style={{ fontSize: '0.85em' }}>Date: ___________________________</p>
-                </div>
-                <div>
-                  <p><strong>SAX TECHNOLOGY</strong></p>
-                  <p style={{ fontSize: '0.85em', marginTop: 8 }}>Signature:</p>
-                  {saxSignatureData ? <img src={saxSignatureData} alt="SAX Sig" style={{ border: '1px solid #9ca3af', borderRadius: 4, height: 60, background: '#f9fafb' }} /> : <div className="signature-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.75em' }}>[Set in Config]</div>}
-                  <p style={{ marginTop: 10, fontSize: '0.85em' }}>Name: {saxSignerName || '___________________________'}</p>
-                  <p style={{ fontSize: '0.85em' }}>Title: {saxSignerTitle || '___________________________'}</p>
-                  <p style={{ fontSize: '0.85em' }}>Date: {new Date().toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
+            {clientSectionOrder.map(key => <React.Fragment key={key}>{sectionRenderers[key]?.() || null}</React.Fragment>)}
           </div>
         </div>
       );
