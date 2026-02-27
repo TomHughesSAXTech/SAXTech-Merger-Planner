@@ -467,6 +467,16 @@
       height: 18px;
     }
     
+    .sow-heading {
+      background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 6px;
+      border-left: 4px solid #FFD700;
+      margin-bottom: 12px;
+      font-size: 1.05rem;
+    }
+    
     .payment-summary {
       background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
       color: white;
@@ -2645,25 +2655,31 @@
       const draw = (e) => { if (!drawing) return; const c = canvasRef.current; const ctx = c.getContext('2d'); const r = c.getBoundingClientRect(); ctx.lineTo(e.clientX - r.left, e.clientY - r.top); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke(); };
       const stopDraw = () => setDrawing(false);
       const clearSig = () => { const c = canvasRef.current; const ctx = c.getContext('2d'); ctx.fillStyle = '#f9fafb'; ctx.fillRect(0, 0, c.width, c.height); };
-      const moveSection = (idx, dir) => {
+      const [dragIdx, setDragIdx] = useState(null);
+      const handleDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; };
+      const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+      const handleDrop = (e, idx) => {
+        e.preventDefault();
+        if (dragIdx === null || dragIdx === idx) { setDragIdx(null); return; }
         setClientSectionOrder(prev => {
           const arr = [...prev];
-          const to = idx + dir;
-          if (to < 0 || to >= arr.length) return prev;
-          [arr[idx], arr[to]] = [arr[to], arr[idx]];
+          const [removed] = arr.splice(dragIdx, 1);
+          arr.splice(idx, 0, removed);
           return arr;
         });
+        setDragIdx(null);
       };
+      const handleDragEnd = () => setDragIdx(null);
       const sectionRenderers = {
         summary: () => clientToggles.showExecutiveSummary && scopeData.scopeDescription && (
           <div data-pdf-section="summary" style={{ marginBottom: 20 }}>
-            <h3>Executive Summary</h3>
+            <h3 className="sow-heading">Executive Summary</h3>
             <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.scopeDescription}</p>
           </div>
         ),
         deliverables: () => clientToggles.showDeliverables && scopeData.deliverables && scopeData.deliverables.filter(d => d && d.trim()).length > 0 && (
           <div data-pdf-section="deliverables" style={{ marginBottom: 20 }}>
-            <h3>Scope of Work \u2014 Deliverables</h3>
+            <h3 className="sow-heading">Scope of Work — Deliverables</h3>
             <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
               {scopeData.deliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
             </ul>
@@ -2671,7 +2687,7 @@
         ),
         'non-deliverables': () => clientToggles.showNonDeliverables && scopeData.nonDeliverables && scopeData.nonDeliverables.filter(d => d && d.trim()).length > 0 && (
           <div data-pdf-section="non-deliverables" style={{ marginBottom: 20 }}>
-            <h3>Exclusions / Non-Deliverables</h3>
+            <h3 className="sow-heading">Exclusions / Non-Deliverables</h3>
             <ul style={{ paddingLeft: 22, fontSize: '0.9em', lineHeight: '1.8' }}>
               {scopeData.nonDeliverables.filter(d => d && d.trim()).map((d, i) => <li key={i}>{d}</li>)}
             </ul>
@@ -2679,13 +2695,13 @@
         ),
         acceptance: () => clientToggles.showAcceptanceCriteria && scopeData.acceptanceCriteria && (
           <div data-pdf-section="acceptance" style={{ marginBottom: 20 }}>
-            <h3>Acceptance Criteria</h3>
+            <h3 className="sow-heading">Acceptance Criteria</h3>
             <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em', lineHeight: '1.6' }}>{scopeData.acceptanceCriteria}</p>
           </div>
         ),
         phases: () => clientToggles.showPhases && (
           <div data-pdf-section="phases" style={{ marginBottom: 20 }}>
-            <h3>Project Phases</h3>
+            <h3 className="sow-heading">Project Phases</h3>
             <table className="preview-table">
               <thead><tr><th>Phase</th>{clientToggles.showPhaseHours && <th>Hours</th>}{clientToggles.showPhasePrices && <th>Investment</th>}</tr></thead>
               <tbody>
@@ -2697,9 +2713,9 @@
         ),
         timeline: () => (clientToggles.showTimeline || ((clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0)) && (
           <div data-pdf-section="timeline" style={{ marginBottom: 20 }}>
-            {clientToggles.showTimeline && <><h3>Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
+            {clientToggles.showTimeline && <><h3 className="sow-heading">Timeline</h3><p>Estimated: <strong>{estimatedWeeks} weeks</strong> ({totalHours} hours)</p>{scopeData.timeline && <p>{scopeData.timeline}</p>}</>}
             {(clientToggles.showMaintenanceWindows || clientToggles.showOutageHours) && maintenanceWindowsNeeded > 0 && (
-              <><h3>Maintenance Requirements</h3>
+              <><h3 className="sow-heading">Maintenance Requirements</h3>
               {clientToggles.showMaintenanceWindows && <p><strong>Windows:</strong> {maintenanceWindowsNeeded}</p>}
               {clientToggles.showOutageHours && totalOutageHours > 0 && <p><strong>Est. Outage:</strong> {totalOutageHours} hrs</p>}
               {scopeData.maintenanceWindowTime && <p><strong>Schedule:</strong> {scopeData.maintenanceWindowTime}</p>}</>
@@ -2708,7 +2724,7 @@
         ),
         investment: () => (
           <div data-pdf-section="investment" style={{ marginBottom: 20 }}>
-            <h3>Investment Summary</h3>
+            <h3 className="sow-heading">Investment Summary</h3>
             <div className="payment-summary">
               <div className="payment-row"><span>Professional Services</span><span>{formatCurrency(laborRevenue)}</span></div>
               {productsTotal > 0 && <div className="payment-row"><span>Products & Equipment</span><span>{formatCurrency(productsTotal + productsInstallLabor)}</span></div>}
@@ -2719,7 +2735,7 @@
         ),
         payment: () => clientToggles.showPaymentTerms && (
           <div data-pdf-section="payment" style={{ marginBottom: 20 }}>
-            <h3>Payment Terms</h3>
+            <h3 className="sow-heading">Payment Terms</h3>
             <table className="preview-table">
               <tbody>
                 <tr><td>Due Upon Signing ({coverData.upfrontPercent}%)</td><td style={{ textAlign: 'right' }}>{formatCurrency(upfrontAmount)}</td></tr>
@@ -2740,13 +2756,13 @@
         ),
         assumptions: () => scopeData.variablesUnknowns && (
           <div data-pdf-section="assumptions" style={{ marginBottom: 20 }}>
-            <h3>Assumptions</h3>
+            <h3 className="sow-heading">Assumptions</h3>
             <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9em' }}>{scopeData.variablesUnknowns}</p>
           </div>
         ),
         signature: () => (
           <div data-pdf-section="signature" className="signature-section">
-            <h3>Authorization</h3>
+            <h3 className="sow-heading">Authorization</h3>
             <p style={{ fontSize: '0.9em' }}>By signing, parties authorize work under these terms.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 20 }}>
               <div>
@@ -2825,14 +2841,15 @@
         <div>
           <div className="toggle-panel">
             <h4>📋 Section Order & Display</h4>
-            <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 10 }}>Use ▲ ▼ to reorder sections. Toggle visibility with checkboxes.</p>
+            <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 10 }}>Drag sections to reorder. Toggle visibility with checkboxes.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {clientSectionOrder.map((key, idx) => {
                 const meta = SECTION_META[key];
                 if (!meta) return null;
                 const isEnabled = !meta.toggleKey || clientToggles[meta.toggleKey] !== false;
                 return (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: isEnabled ? '#fff' : '#f0f0f0', borderRadius: 6, border: '1px solid #dee2e6', opacity: isEnabled ? 1 : 0.5 }}>
+                  <div key={key} draggable onDragStart={(e) => handleDragStart(e, idx)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, idx)} onDragEnd={handleDragEnd} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: dragIdx === idx ? '#fff3cd' : isEnabled ? '#fff' : '#f0f0f0', borderRadius: 6, border: dragIdx === idx ? '2px dashed #FFD700' : '1px solid #dee2e6', opacity: isEnabled ? 1 : 0.5, cursor: 'grab', transition: 'background 0.2s, border 0.2s' }}>
+                    <span style={{ fontSize: '1.1rem', color: '#6c757d', cursor: 'grab', userSelect: 'none' }}>{"\u2630"}</span>
                     {meta.toggleKey ? (
                       <input type="checkbox" checked={!!clientToggles[meta.toggleKey]} onChange={(e) => setClientToggles(prev => ({ ...prev, [meta.toggleKey]: e.target.checked }))} style={{ width: 16, height: 16 }} />
                     ) : (
@@ -2849,8 +2866,6 @@
                         ))}
                       </span>
                     )}
-                    <button onClick={() => moveSection(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: '1px solid #ced4da', borderRadius: 4, padding: '2px 8px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '0.8rem' }}>{"\u25B2"}</button>
-                    <button onClick={() => moveSection(idx, 1)} disabled={idx === clientSectionOrder.length - 1} style={{ background: 'none', border: '1px solid #ced4da', borderRadius: 4, padding: '2px 8px', cursor: idx === clientSectionOrder.length - 1 ? 'default' : 'pointer', opacity: idx === clientSectionOrder.length - 1 ? 0.3 : 1, fontSize: '0.8rem' }}>{"\u25BC"}</button>
                   </div>
                 );
               })}
