@@ -38,9 +38,14 @@ module.exports = async function (context, req) {
         const container = database.container('Sessions');
         
         const body = req.body;
-        const { sessionId, discoveryData, decisionTree } = body;
+        const { sessionId } = body;
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
+
+        // Use discoveryData from request body, or fall back to session data
+        const discoveryData = body.discoveryData || session.discoveryData || {};
+        // Decision tree is optional - provide safe default
+        const decisionTree = body.decisionTree || { nodes: [], edges: [] };
 
         // Load configuration to allow OpenAI overrides
         const configClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
@@ -104,7 +109,7 @@ Discovery Data (JSON):
 ${JSON.stringify(discoveryData, null, 2)}
 
 Decision Tree Summary:
-${decisionTree.nodes.length} nodes, ${decisionTree.edges.length} edges
+${(decisionTree.nodes || []).length} nodes, ${(decisionTree.edges || []).length} edges
 
 Generate an execution plan with:
 1. Phases that follow this structure where appropriate:
