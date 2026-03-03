@@ -66,7 +66,7 @@ function App() {
     window.location.pathname === '/admin.html'
   );
   const [config, setConfig] = useState(null);
-  const [viewMode, setViewMode] = useState('plan'); // 'plan' | 'network'
+  const [viewMode, setViewMode] = useState('network'); // 'plan' | 'network'
   const [planHistory, setPlanHistory] = useState([]);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
@@ -222,24 +222,31 @@ function App() {
     if (!data || Object.keys(data).length === 0) return;
 
     const entries = Object.entries(data || {});
+
+    const deepStringify = (v) => {
+      if (v == null) return '';
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      if (Array.isArray(v)) {
+        return v.map(item => {
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object') {
+            if (item.name) return item.role ? `${item.name} (${item.role})` : item.name;
+            return Object.entries(item).map(([k2, v2]) => `${k2}: ${deepStringify(v2)}`).join(', ');
+          }
+          return String(item);
+        }).join(', ');
+      }
+      if (typeof v === 'object') {
+        if (v.name) return v.role ? `${v.name} (${v.role})` : v.name;
+        return Object.entries(v).map(([k2, v2]) => `${k2}: ${deepStringify(v2)}`).join(', ');
+      }
+      return String(v);
+    };
+
     const summaryParts = entries.slice(0, 4).map(([key, value]) => {
       const formattedKey = key.replace(/_/g, ' ');
-      let stringValue;
-
-      if (Array.isArray(value)) {
-        stringValue = value.join(', ');
-      } else if (value && typeof value === 'object') {
-        // Special handling for common "POC"-style objects with a name/role
-        if (typeof value.name === 'string') {
-          stringValue = value.role ? `${value.name} (${value.role})` : value.name;
-        } else {
-          stringValue = '[object]';
-        }
-      } else {
-        stringValue = String(value);
-      }
-
-      return `${formattedKey}: ${stringValue}`;
+      return `${formattedKey}: ${deepStringify(value)}`;
     });
     const summary = summaryParts.join('\n');
 

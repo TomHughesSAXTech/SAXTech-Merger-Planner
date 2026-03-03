@@ -50,7 +50,7 @@ module.exports = async function (context, req) {
     try {
         const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
         const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
+        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
@@ -81,7 +81,19 @@ module.exports = async function (context, req) {
         // the model should only acknowledge and extract facts.
         const categoryConfig = config?.categories?.find(c => c.id === category);
         const basePrompt = categoryConfig?.extractionPrompt || defaultCategoryPrompts[category] || 'You are an M&A onboarding assistant.';
-        const systemPrompt = `${basePrompt}\n\nCRITICAL BEHAVIOR RULES:\n- Do NOT ask the user any questions.\n- Do NOT propose next topics or sections.\n- ONLY respond with a brief 1-2 sentence acknowledgement or summary of what they just told you.\n- Assume the UI will handle asking all discovery questions. Your primary job is to internally extract structured facts, not to drive the interview.`;
+        const systemPrompt = `You are an expert M&A IT migration discovery assistant for SAX Advisory Group. You are conducting a structured IT infrastructure discovery for a Lift-and-Shift M&A migration — the same type of engagement SAX has completed for firms like FAZ and OJF.
+
+Your role: acknowledge the user's response, briefly summarize the key facts you heard, and mentally map everything to a network topology (servers, firewalls, switches, VPNs, cloud services, SaaS apps, workstations, phones, backup systems, ISPs, etc.).
+
+Category context: ${basePrompt}
+
+CRITICAL BEHAVIOR RULES:
+- Do NOT ask the user any questions.
+- Do NOT propose next topics or sections.
+- ONLY respond with a brief 1-2 sentence acknowledgement summarizing the key infrastructure facts you just learned.
+- When acknowledging, reference specific items by name (e.g. "Got it — 2 on-prem servers running Server 2019, SonicWall TZ400 firewall, and Meraki switches.").
+- Assume the UI will handle asking all discovery questions.
+- Your primary job is to extract structured facts for the network diagram and migration plan.`;
 
         const { resource: session } = await container.item(sessionId, sessionId).read();
 
@@ -105,8 +117,8 @@ module.exports = async function (context, req) {
             defaultDeployment,
             messages,
             {
-                maxTokens: 500,
-                temperature: 0.7
+                maxTokens: 1000,
+                temperature: 0.5
             },
             context,
             'chat-process main response'
@@ -124,7 +136,22 @@ module.exports = async function (context, req) {
         let categoryComplete = false;
 
         // Get extraction prompt from config or use default
-        const extractionPrompt = categoryConfig?.extractionPrompt || `Extract any factual ${category} information from the user's latest response. Return ONLY a JSON object with discovered facts. If no new facts, return {}.`;
+        const extractionPrompt = `You are extracting structured IT infrastructure facts from a user's response during an M&A discovery for category "${category}".
+
+Return ONLY valid JSON with snake_case keys. Structure the data so it can be rendered as network diagram nodes.
+
+For the "network" category, use keys like: firewall_brand, firewall_model, switch_brands, switch_count, wifi_system, wifi_ap_count, isp_primary, isp_secondary, vpn_brand, vpn_type, dns_host, domain_registrar, camera_count, printer_count, sites (array of {name, type, address}).
+For "server" category: servers (array of {name, role, os, location, type}), server_count, cloud_provider, virtualization_platform.
+For "workstation" category: workstation_count, workstation_types, os_versions, domain_join_type, shared_devices.
+For "security" category: edr_vendor, email_filter, mfa_enabled, password_policy, compliance_requirements, dns_filtering, security_training.
+For "backup" category: backup_platform, backup_frequency, backup_retention, backup_scope, total_backup_volume.
+For "applications" category: applications (array of {name, vendor, type, sso_enabled}), document_storage, time_billing, tax_platform, accounting_platform.
+For "telephony" category: phone_provider, phone_system_type, phone_numbers_to_port, call_routing.
+For "rmm" category: rmm_vendor, ticketing_system, sla_details, patching_method.
+For "vendor" category: msps (array of {name, services, contract_end}), vendor_partnerships.
+For "general" category: company_name, primary_poc (object with name/email/phone/role), total_users, dealroom_name, deal_signing_date, onboarding_start_date.
+
+If no new facts are found, return {}. ONLY return valid JSON.`;
         
         // Always try to extract data from recent conversation
         const extractionMessages = [

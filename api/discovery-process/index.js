@@ -29,7 +29,7 @@ module.exports = async function (context, req) {
     try {
         const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
         const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4.1-mini';
+        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
