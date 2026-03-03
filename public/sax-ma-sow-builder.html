@@ -2801,7 +2801,8 @@
         for (let i = 0; i < sections.length; i++) {
           const section = sections[i];
           if (section.offsetHeight < 2) continue;
-          const canvas = await html2canvas(section, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          const canvas = await html2canvas(section, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+          const imgData = canvas.toDataURL('image/jpeg', 0.85);
           const imgWidth = usableWidth;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -2810,7 +2811,7 @@
               doc.addPage();
               yPos = margin;
             }
-            doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, yPos, imgWidth, imgHeight);
+            doc.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
             yPos += imgHeight + 4;
           } else {
             if (yPos > margin + 1) { doc.addPage(); yPos = margin; }
@@ -2823,7 +2824,7 @@
               chunkCanvas.width = canvas.width;
               chunkCanvas.height = chunkPx;
               chunkCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, chunkPx, 0, 0, canvas.width, chunkPx);
-              doc.addImage(chunkCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgWidth, chunkMM);
+              doc.addImage(chunkCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', margin, margin, imgWidth, chunkMM);
               srcY += chunkPx;
               if (srcY < canvas.height) {
                 doc.addPage();
