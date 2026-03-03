@@ -11,6 +11,12 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   const [askedQuestions, setAskedQuestions] = useState([]);
   const [resumed, setResumed] = useState(false);
   const resumeQuestionAsked = useRef(false);
+  // Detect if this is a session-resume load (sessionId in URL or localStorage)
+  const isResumeMode = useRef(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('sessionId')) return true;
+    try { return !!window.localStorage.getItem('maonboarding-session-id'); } catch { return false; }
+  })();
   const messagesEndRef = useRef(null);
 
   // Default questions (fallback if config not available)
@@ -75,11 +81,14 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
           return;
         }
         setConfig(data);
-        // Set initial category from config or fallback to infrastructure
-        if (data?.config?.categories?.length > 0) {
-          setCurrentCategory(data.config.categories[0].id);
-        } else if (!currentCategory) {
-          setCurrentCategory('infrastructure');
+        // Only set initial category for NEW sessions – on resume the
+        // resume effect will set the correct category once data arrives.
+        if (!isResumeMode.current) {
+          if (data?.config?.categories?.length > 0) {
+            setCurrentCategory(data.config.categories[0].id);
+          } else if (!currentCategory) {
+            setCurrentCategory('infrastructure');
+          }
         }
       } catch (error) {
         console.error('Failed to load config, using defaults:', error);
@@ -94,8 +103,9 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   // Restore session messages and determine resume category when initialMessages arrive
   useEffect(() => {
     if (resumed || !initialMessages || initialMessages.length === 0 || !config) return;
-    // Load historical messages
-    setMessages(initialMessages.map(m => ({
+    // Load last 20 historical messages so the chat isn't overwhelming
+    const recent = initialMessages.slice(-20);
+    setMessages(recent.map(m => ({
       role: m.role,
       content: m.content,
       timestamp: m.timestamp || new Date().toISOString()
@@ -138,8 +148,8 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   }, [currentCategory, onCategoryChange]);
 
   useEffect(() => {
-    // Initialize with welcome message only for NEW sessions (no initialMessages)
-    if (messages.length === 0 && sessionId && currentCategory && !initialMessages) {
+    // Initialize with welcome message only for NEW sessions
+    if (messages.length === 0 && sessionId && currentCategory && !initialMessages && !isResumeMode.current) {
       const categoryName = config?.config?.categories?.find(c => c.id === currentCategory)?.name || currentCategory;
       addMessage({
         role: 'assistant',
