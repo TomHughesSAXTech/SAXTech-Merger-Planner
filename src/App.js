@@ -409,13 +409,21 @@ function App() {
     }
   };
 
+  const resetPlan = () => {
+    // Strip plan nodes/edges, keep only root + discovery category nodes
+    const { baseNodes, baseEdges } = filterBaseGraph();
+    const layouted = getLayoutedElements(baseNodes, baseEdges);
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  };
+
   const saveCurrentPlan = async () => {
     if (!sessionId) return;
     const name = window.prompt('Save plan as (name):', 'Execution Plan');
     if (!name) return;
     setIsSavingPlan(true);
     try {
-      const response = await fetch('/api/plan-history-save', {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, name, nodes, edges })
@@ -437,7 +445,7 @@ function App() {
   const loadPlanHistory = async () => {
     if (!sessionId) return;
     try {
-      const response = await fetch('/api/plan-history-list', {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId })
@@ -457,7 +465,7 @@ function App() {
   const applyHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('/api/plan-history-load', {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })
@@ -483,7 +491,7 @@ function App() {
   const deleteHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('/api/plan-history-delete', {
+      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })
@@ -574,6 +582,13 @@ function App() {
             className="btn btn-secondary"
           >
             Plan History
+          </button>
+          <button
+            onClick={resetPlan}
+            className="btn btn-secondary"
+            style={{ color: '#D13438', borderColor: '#D13438' }}
+          >
+            Reset Plan
           </button>
           <button onClick={exportTree} className="btn btn-secondary">
             <Download className="inline" /> Export
