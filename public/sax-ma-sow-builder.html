@@ -837,6 +837,10 @@
     function App() {
       const [activeTab, setActiveTab] = useState('cover');
       const [initializedFromPlan, setInitializedFromPlan] = useState(false);
+      const [loadingFromPlan, setLoadingFromPlan] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return !!params.get('sessionId');
+      });
       
       // Cover data
       const [coverData, setCoverData] = useState({
@@ -1263,6 +1267,7 @@
         if (!sessionId) return;
 
         async function loadFromPlan() {
+          setLoadingFromPlan(true);
           try {
             const resp = await fetch(
               'https://maonboarding-functions.azurewebsites.net/api/sow-builder-data?sessionId=' +
@@ -1292,6 +1297,8 @@
             setInitializedFromPlan(true);
           } catch (err) {
             console.error('Failed to load SOW data from execution plan', err);
+          } finally {
+            setLoadingFromPlan(false);
           }
         }
 
@@ -1630,6 +1637,12 @@
             <p>Professional Services Estimation & Quoting Platform</p>
           </div>
           
+          {loadingFromPlan && (
+            <div style={{background:'#2563EB',color:'white',padding:'12px 20px',borderRadius:10,marginBottom:12,textAlign:'center',fontWeight:600,fontSize:'1rem',animation:'pulse 1.5s infinite'}}>
+              ⏳ Loading SOW data from execution plan via AI... This may take up to 60 seconds.
+            </div>
+          )}
+
           <div className="export-bar">
             <span>📤 Actions:</span>
             <button className="btn btn-primary" onClick={openSaveModal}>💾 Save Proposal to Azure</button>
