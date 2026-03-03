@@ -75,9 +75,7 @@ module.exports = async function (context, req) {
     const completion = await openAIClient.getChatCompletions(deploymentName, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
-    ], {
-      temperature: 0.2
-    });
+    ], {});
 
     let extracted;
     try {

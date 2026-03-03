@@ -116,9 +116,7 @@ CRITICAL BEHAVIOR RULES:
             deploymentName,
             defaultDeployment,
             messages,
-            {
-                temperature: 0.5
-            },
+            {},
             context,
             'chat-process main response'
         );
@@ -164,9 +162,7 @@ If no new facts are found, return {}. ONLY return valid JSON.`;
                 deploymentName,
                 defaultDeployment,
                 extractionMessages,
-                {
-                    temperature: 0.2
-                },
+                {},
                 context,
                 'chat-process discovery extraction'
             );

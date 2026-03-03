@@ -172,9 +172,7 @@ Return STRICT JSON with this shape (no comments, no extra fields):
                 { role: 'system', content: 'You are an M&A integration planning expert. Generate detailed, actionable execution plans.' },
                 { role: 'user', content: planPrompt }
             ],
-            {
-                temperature: 0.5
-            },
+            {},
             context,
             'plan-generate execution plan'
         );

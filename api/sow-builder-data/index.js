@@ -273,9 +273,7 @@ Rules:
           { role: 'system', content: 'You are an M&A integration planning expert and SOW estimator.' },
           { role: 'user', content: transformPrompt }
         ],
-        {
-          temperature: 0.4
-        },
+        {},
         context,
         'sow-builder-data SOW transform'
       );
