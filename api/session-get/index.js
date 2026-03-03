@@ -45,7 +45,8 @@ module.exports = async function (context, req) {
         sessionId: session.id,
         discoveryData: session.discoveryData || {},
         createdAt: session.createdAt || session._ts,
-        messages: session.messages || []
+        messages: session.messages || [],
+        executionPlan: session.executionPlan || null
       }
     };
   } catch (error) {
