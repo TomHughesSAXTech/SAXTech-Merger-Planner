@@ -173,7 +173,6 @@ Return STRICT JSON with this shape (no comments, no extra fields):
                 { role: 'user', content: planPrompt }
             ],
             {
-                maxTokens: 2000,
                 temperature: 0.5
             },
             context,

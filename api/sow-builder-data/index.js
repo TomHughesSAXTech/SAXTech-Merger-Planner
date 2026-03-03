@@ -274,7 +274,6 @@ Rules:
           { role: 'user', content: transformPrompt }
         ],
         {
-          maxTokens: 1200,
           temperature: 0.4
         },
         context,

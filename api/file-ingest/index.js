@@ -76,7 +76,6 @@ module.exports = async function (context, req) {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ], {
-      maxTokens: 1200,
       temperature: 0.2
     });
 

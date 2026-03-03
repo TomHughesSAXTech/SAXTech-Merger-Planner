@@ -81,7 +81,6 @@ module.exports = async function (context, req) {
             ],
             {
                 temperature: 0.3,
-                max_tokens: 2000,
                 functions: [getTreeGenerationFunction()],
                 function_call: { name: 'generate_decision_nodes' }
             },

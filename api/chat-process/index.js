@@ -117,7 +117,6 @@ CRITICAL BEHAVIOR RULES:
             defaultDeployment,
             messages,
             {
-                maxTokens: 1000,
                 temperature: 0.5
             },
             context,
@@ -166,7 +165,6 @@ If no new facts are found, return {}. ONLY return valid JSON.`;
                 defaultDeployment,
                 extractionMessages,
                 {
-                    maxTokens: 300,
                     temperature: 0.2
                 },
                 context,
