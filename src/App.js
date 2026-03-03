@@ -70,6 +70,8 @@ function App() {
   const [planHistory, setPlanHistory] = useState([]);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [resumedMessages, setResumedMessages] = useState(null);
+  const [resumedCategory, setResumedCategory] = useState(null);
 
   const persistSessionId = (id) => {
     try {
@@ -102,6 +104,22 @@ function App() {
 
       const loadedDiscovery = data.discoveryData || {};
       setDiscoveryData(loadedDiscovery);
+
+      // Restore chat messages so ChatInterface can resume
+      if (data.messages && data.messages.length > 0) {
+        setResumedMessages(data.messages);
+      }
+
+      // Determine which category to resume from: first category without data
+      // (requires config to be loaded, so we also check later)
+      const categoriesWithData = Object.keys(loadedDiscovery).filter(
+        (k) => loadedDiscovery[k] && Object.keys(loadedDiscovery[k]).length > 0
+      );
+      if (categoriesWithData.length > 0) {
+        // We'll let ChatInterface figure out the exact resume category once
+        // config is loaded. Store a hint of categories already completed.
+        setResumedCategory(categoriesWithData);
+      }
 
       // Ensure root node exists when resuming an existing session
       const rootNode = {
@@ -582,6 +600,8 @@ function App() {
             onDiscoveryUpdate={handleDiscoveryResponse}
             currentPhase={currentPhase}
             onCategoryChange={handleCategoryChange}
+            initialMessages={resumedMessages}
+            completedCategories={resumedCategory}
           />
           <DiscoveryPanel 
             discoveryData={discoveryData}

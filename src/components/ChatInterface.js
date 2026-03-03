@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
 import './ChatInterface.css';
 
-const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryChange }) => {
+const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryChange, initialMessages, completedCategories }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentCategory, setCurrentCategory] = useState(null);
   const [config, setConfig] = useState(null);
   const [askedQuestions, setAskedQuestions] = useState([]);
+  const [resumed, setResumed] = useState(false);
+  const resumeQuestionAsked = useRef(false);
   const messagesEndRef = useRef(null);
 
   // Default questions (fallback if config not available)
@@ -89,6 +91,46 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
     loadConfig();
   }, []);
 
+  // Restore session messages and determine resume category when initialMessages arrive
+  useEffect(() => {
+    if (resumed || !initialMessages || initialMessages.length === 0 || !config) return;
+    // Load historical messages
+    setMessages(initialMessages.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp || new Date().toISOString()
+    })));
+    // Determine which category to resume from
+    const allCategories = config?.config?.categories?.map(c => c.id) || Object.keys(defaultDiscoveryQuestions);
+    const completedSet = new Set(completedCategories || []);
+    const resumeCategory = allCategories.find(c => !completedSet.has(c)) || allCategories[allCategories.length - 1];
+    setCurrentCategory(resumeCategory);
+    // Mark all questions for completed categories as asked so we skip them
+    const fakeAsked = [];
+    completedSet.forEach(catId => {
+      const catConfig = config?.config?.categories?.find(c => c.id === catId);
+      const qs = catConfig?.questions || defaultDiscoveryQuestions[catId] || [];
+      qs.forEach(q => fakeAsked.push({ category: catId, question: q }));
+    });
+    setAskedQuestions(fakeAsked);
+    setResumed(true);
+  }, [initialMessages, config, resumed, completedCategories]);
+
+  // After resume completes, greet and ask the next question
+  useEffect(() => {
+    if (!resumed || !currentCategory || !config || resumeQuestionAsked.current) return;
+    resumeQuestionAsked.current = true;
+    const categoryName = config?.config?.categories?.find(c => c.id === currentCategory)?.name || currentCategory;
+    addMessage({
+      role: 'assistant',
+      content: `Session resumed! Let's continue with ${categoryName} discovery.`,
+      timestamp: new Date().toISOString()
+    });
+    setTimeout(() => {
+      askNextQuestion(currentCategory);
+    }, 1000);
+  }, [resumed, currentCategory, config]);
+
   useEffect(() => {
     if (currentCategory && onCategoryChange) {
       onCategoryChange(currentCategory);
@@ -96,8 +138,8 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   }, [currentCategory, onCategoryChange]);
 
   useEffect(() => {
-    // Initialize with welcome message
-    if (messages.length === 0 && sessionId && currentCategory) {
+    // Initialize with welcome message only for NEW sessions (no initialMessages)
+    if (messages.length === 0 && sessionId && currentCategory && !initialMessages) {
       const categoryName = config?.config?.categories?.find(c => c.id === currentCategory)?.name || currentCategory;
       addMessage({
         role: 'assistant',
@@ -158,12 +200,13 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
+  const handleSend = async (overrideMessage) => {
+    const messageText = overrideMessage || input;
+    if (!messageText.trim() || isTyping) return;
 
     const userMessage = {
       role: 'user',
-      content: input,
+      content: messageText,
       timestamp: new Date().toISOString()
     };
 
@@ -178,7 +221,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          message: input,
+          message: messageText,
           category: currentCategory,
           context: messages.slice(-10) // Last 10 messages for context
         })
@@ -311,7 +354,14 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
           <button 
             key={index}
             className="quick-action-btn"
-            onClick={() => setInput(action)}
+            onClick={() => {
+              // Auto-send "Finished" actions to advance the category immediately
+              if (action.toLowerCase().includes('finished') || action.toLowerCase().includes('move on')) {
+                handleSend(action);
+              } else {
+                setInput(action);
+              }
+            }}
           >
             {action}
           </button>
