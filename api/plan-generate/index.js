@@ -125,7 +125,6 @@ Generate an execution plan with:
 3. Dependencies between tasks (by id) when order matters.
 4. High-level timeline summary (days/weeks).
 5. Risk factors.
-6. ConnectWise ticket recommendations.
 
 IMPORTANT HOUR GUIDANCE:
 - For environments similar in size to the reference (2 servers, ~5
@@ -163,11 +162,8 @@ Return STRICT JSON with this shape (no comments, no extra fields):
   },
   "risks": [
     { "description": "...", "impact": "low | medium | high | critical", "mitigation": "..." }
-  ],
-  "connectwiseTickets": [
-    { "title": "...", "description": "...", "type": "project | task | change", "priority": "low | medium | high" }
   ]
-}`;
+}
 
         const completion = await getChatCompletionsWithFallback(
             openAIClient,
@@ -194,8 +190,7 @@ Return STRICT JSON with this shape (no comments, no extra fields):
                     { id: 'integration', name: 'Integration', tasks: ['System integration', 'User training'] }
                 ],
                 timeline: { totalDays: 90, milestones: [] },
-                risks: [],
-                connectwiseTickets: []
+                risks: []
             };
         }
 

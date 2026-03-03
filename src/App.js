@@ -383,29 +383,10 @@ function App() {
         setEdges(layouted.edges);
       }
       
-      // Export to ConnectWise if configured
-      if (plan.connectwiseTickets) {
-        await createConnectWiseTickets(plan.connectwiseTickets);
-      }
     } catch (error) {
       console.error('Failed to generate execution plan:', error);
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const createConnectWiseTickets = async (tickets) => {
-    try {
-      const response = await fetch('/api/connectwise-tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickets })
-      });
-      
-      const result = await response.json();
-      console.log('ConnectWise tickets created:', result);
-    } catch (error) {
-      console.error('Failed to create ConnectWise tickets:', error);
     }
   };
 
