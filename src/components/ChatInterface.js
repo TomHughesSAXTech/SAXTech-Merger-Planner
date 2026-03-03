@@ -12,11 +12,11 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   const [resumed, setResumed] = useState(false);
   const resumeQuestionAsked = useRef(false);
   // Detect if this is a session-resume load (sessionId in URL or localStorage)
-  const isResumeMode = useRef(() => {
+  const isResumeMode = useRef((() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get('sessionId')) return true;
-    try { return !!window.localStorage.getItem('maonboarding-session-id'); } catch { return false; }
-  })();
+    try { return !!window.localStorage.getItem('maonboarding-session-id'); } catch(e) { return false; }
+  })());
   const messagesEndRef = useRef(null);
 
   // Default questions (fallback if config not available)
