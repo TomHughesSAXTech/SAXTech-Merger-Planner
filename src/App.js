@@ -70,101 +70,35 @@ function App() {
   const [planHistory, setPlanHistory] = useState([]);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
-  const [resumedMessages, setResumedMessages] = useState(null);
-  const [resumedCategory, setResumedCategory] = useState(null);
 
-  const persistSessionId = (id) => {
+  const clearPersistedSession = () => {
     try {
-      if (id) {
-        window.localStorage.setItem('maonboarding-session-id', id);
-        const url = new URL(window.location.href);
-        url.searchParams.set('sessionId', id);
+      window.localStorage.removeItem('maonboarding-session-id');
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('sessionId')) {
+        url.searchParams.delete('sessionId');
         window.history.replaceState({}, '', url.toString());
       }
     } catch (err) {
-      console.error('Failed to persist sessionId:', err);
+      console.error('Failed to clear persisted session:', err);
     }
   };
 
-  const resumeSession = async (existingSessionId) => {
-    if (!existingSessionId) return;
-    setSessionId(existingSessionId);
-    persistSessionId(existingSessionId);
-    try {
-      const response = await fetch(`https://maonboarding-functions.azurewebsites.net/api/session-get?sessionId=${encodeURIComponent(existingSessionId)}`);
-      if (!response.ok) {
-        console.error('Failed to resume session: HTTP', response.status);
-        return;
-      }
-      const data = await response.json().catch((err) => {
-        console.error('Failed to parse session-get response:', err);
-        return null;
-      });
-      if (!data) return;
-
-      const loadedDiscovery = data.discoveryData || {};
-      setDiscoveryData(loadedDiscovery);
-
-      // Restore chat messages so ChatInterface can resume
-      if (data.messages && data.messages.length > 0) {
-        setResumedMessages(data.messages);
-      }
-
-      // Determine which category to resume from: first category without data
-      // (requires config to be loaded, so we also check later)
-      const categoriesWithData = Object.keys(loadedDiscovery).filter(
-        (k) => loadedDiscovery[k] && Object.keys(loadedDiscovery[k]).length > 0
-      );
-      if (categoriesWithData.length > 0) {
-        // We'll let ChatInterface figure out the exact resume category once
-        // config is loaded. Store a hint of categories already completed.
-        setResumedCategory(categoriesWithData);
-      }
-
-      // Ensure root node exists when resuming an existing session
-      const rootNode = {
-        id: 'root',
-        type: 'input',
-        data: {
-          label: 'M&A Discovery',
-          status: 'active',
-          description: 'Starting point for IT infrastructure discovery'
-        },
-        position: { x: 0, y: 0 },
-        style: {
-          background: '#0078D4',
-          color: 'white',
-          border: '2px solid #005A9E',
-          borderRadius: '8px',
-          padding: '10px'
-        }
-      };
-      setNodes([rootNode]);
-      setEdges([]);
-
-      Object.entries(loadedDiscovery).forEach(([category, categoryData]) => {
-        updateCategoryNode(category, categoryData);
-      });
-    } catch (error) {
-      console.error('Failed to resume session:', error);
-    }
+  const startFreshSession = async () => {
+    clearPersistedSession();
+    setSessionId(null);
+    setDiscoveryData({});
+    setCurrentPhase(null);
+    setPlanHistory([]);
+    setShowPlanHistory(false);
+    setViewMode('network');
+    setNodes([]);
+    setEdges([]);
+    await initializeSession();
   };
 
   useEffect(() => {
-    // Attempt resume from URL or localStorage; otherwise create new session
-    const url = new URL(window.location.href);
-    let existingId = url.searchParams.get('sessionId');
-    if (!existingId) {
-      try {
-        existingId = window.localStorage.getItem('maonboarding-session-id');
-      } catch {}
-    }
-
-    if (existingId) {
-      resumeSession(existingId);
-    } else {
-      initializeSession();
-    }
+    startFreshSession();
 
     // Load configuration
     loadConfig();
@@ -189,7 +123,6 @@ function App() {
   };
 
   const initializeSession = async () => {
-    console.log('[DEBUG] Initializing session...');
     try {
       const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/session-init', {
         method: 'GET',
@@ -207,9 +140,7 @@ function App() {
         console.error('Session-init response missing sessionId');
         return;
       }
-      console.log('[DEBUG] Session initialized:', data.sessionId);
       setSessionId(data.sessionId);
-      persistSessionId(data.sessionId);
       
       // Set initial root node
       const initialNodes = [{
@@ -390,12 +321,8 @@ function App() {
     }
   };
 
-  const resetPlan = () => {
-    // Strip plan nodes/edges, keep only root + discovery category nodes
-    const { baseNodes, baseEdges } = filterBaseGraph();
-    const layouted = getLayoutedElements(baseNodes, baseEdges);
-    setNodes(layouted.nodes);
-    setEdges(layouted.edges);
+  const resetPlan = async () => {
+    await startFreshSession();
   };
 
   const saveCurrentPlan = async () => {
@@ -592,12 +519,11 @@ function App() {
       <div className="main-content">
         <div className="left-panel">
           <ChatInterface 
+            key={sessionId || 'fresh-session'}
             sessionId={sessionId}
             onDiscoveryUpdate={handleDiscoveryResponse}
             currentPhase={currentPhase}
             onCategoryChange={handleCategoryChange}
-            initialMessages={resumedMessages}
-            completedCategories={resumedCategory}
           />
           <DiscoveryPanel 
             discoveryData={discoveryData}
