@@ -518,10 +518,9 @@ function App() {
             onClick={() => {
               if (sessionId) {
                 window.open(`/sax-ma-sow-builder.html?sessionId=${sessionId}`, '_blank');
-              } else {
-                window.open('/sax-ma-sow-builder.html', '_blank');
               }
             }}
+            disabled={!sessionId}
             className="btn btn-secondary"
           >
             SOW Builder
