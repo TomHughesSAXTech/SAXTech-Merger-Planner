@@ -61,37 +61,54 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
     cancelEditing();
   };
 
-  const formatDiscoveryItem = (categoryId, key, value) => {
+  const stringifyPrimitive = (v) => {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return JSON.stringify(v);
+  };
+
+  const formatDiscoveryItem = (categoryId, key, value, keyPath = key) => {
     // Format the key to be more readable
     const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     
     // Handle different value types
     if (typeof value === 'object' && !Array.isArray(value)) {
       return (
-        <div key={key} className="discovery-item nested">
+        <div key={keyPath} className="discovery-item nested">
           <div className="item-key">{formattedKey}:</div>
           <div className="nested-items">
-            {Object.entries(value).map(([k, v]) => formatDiscoveryItem(categoryId, k, v))}
+            {Object.entries(value).map(([k, v]) =>
+              formatDiscoveryItem(categoryId, k, v, `${keyPath}.${k}`)
+            )}
           </div>
         </div>
       );
     } else if (Array.isArray(value)) {
       return (
-        <div key={key} className="discovery-item">
+        <div key={keyPath} className="discovery-item">
           <div className="item-key">{formattedKey}:</div>
           <ul className="item-list">
-            {value.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
+            {value.map((item, index) => {
+              const listKey = `${keyPath}[${index}]`;
+              if (item && typeof item === 'object') {
+                const objectSummary = Object.entries(item)
+                  .map(([k, v]) => `${k}: ${stringifyPrimitive(v)}`)
+                  .join(', ');
+                return <li key={listKey}>{objectSummary}</li>;
+              }
+              return <li key={listKey}>{stringifyPrimitive(item)}</li>;
+            })}
           </ul>
         </div>
       );
     } else {
+      const isTopLevelField = !keyPath.includes('.') && !keyPath.includes('[');
       const isEditing =
-        editing && editing.categoryId === categoryId && editing.key === key;
+        isTopLevelField && editing && editing.categoryId === categoryId && editing.key === key;
 
       return (
-        <div key={key} className="discovery-item">
+        <div key={keyPath} className="discovery-item">
           <span className="item-key">{formattedKey}:</span>
           {isEditing ? (
             <input
@@ -107,10 +124,12 @@ const DiscoveryPanel = ({ discoveryData, currentPhase, config, onEdit }) => {
             />
           ) : (
             <span
-              className="item-value editable"
-              onClick={() => startEditing(categoryId, key, value)}
+              className={`item-value ${isTopLevelField ? 'editable' : ''}`}
+              onClick={() => {
+                if (isTopLevelField) startEditing(categoryId, key, value);
+              }}
             >
-              {value}
+              {stringifyPrimitive(value)}
             </span>
           )}
         </div>

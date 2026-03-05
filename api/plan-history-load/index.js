@@ -46,7 +46,7 @@ module.exports = async function (context, req) {
 
     const history = Array.isArray(session.planHistory) ? session.planHistory : [];
     const entry = history.find(h => h.id === planId);
-    if (!entry || !entry.blobName) {
+    if (!entry) {
       context.res = {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
@@ -54,9 +54,32 @@ module.exports = async function (context, req) {
       };
       return;
     }
+    const sendSnapshot = (snapshot, source = 'snapshot') => {
+      context.res = {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: {
+          name: entry.name,
+          createdAt: entry.createdAt,
+          source,
+          executionPlan: snapshot?.executionPlan || null,
+          nodes: snapshot?.nodes || [],
+          edges: snapshot?.edges || []
+        }
+      };
+    };
+
+    if (!entry.blobName && entry.snapshot) {
+      sendSnapshot(entry.snapshot, 'snapshot-only');
+      return;
+    }
 
     const conn = process.env.STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
     if (!BlobServiceClient || !conn) {
+      if (entry.snapshot) {
+        sendSnapshot(entry.snapshot, 'snapshot-fallback-no-storage');
+        return;
+      }
       context.res = {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -65,24 +88,22 @@ module.exports = async function (context, req) {
       return;
     }
 
-    const service = BlobServiceClient.fromConnectionString(conn);
-    const containerClient = service.getContainerClient('plan-history');
-    const blobClient = containerClient.getBlockBlobClient(entry.blobName);
-    const download = await blobClient.download();
-    const downloaded = await streamToString(download.readableStreamBody);
-    const payload = JSON.parse(downloaded || '{}');
-
-    context.res = {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: {
-        name: entry.name,
-        createdAt: entry.createdAt,
-        executionPlan: payload.executionPlan || null,
-        nodes: payload.nodes || [],
-        edges: payload.edges || []
+    try {
+      const service = BlobServiceClient.fromConnectionString(conn);
+      const containerClient = service.getContainerClient('plan-history');
+      const blobClient = containerClient.getBlockBlobClient(entry.blobName);
+      const download = await blobClient.download();
+      const downloaded = await streamToString(download.readableStreamBody);
+      const payload = JSON.parse(downloaded || '{}');
+      sendSnapshot(payload, 'blob');
+    } catch (storageError) {
+      context.log.warn('[plan-history-load] Blob load failed, attempting snapshot fallback:', storageError.message);
+      if (entry.snapshot) {
+        sendSnapshot(entry.snapshot, 'snapshot-fallback-after-blob-error');
+        return;
       }
-    };
+      throw storageError;
+    }
   } catch (error) {
     context.log.error('Error loading plan history:', error);
     context.res = {

@@ -1,35 +1,11 @@
-const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
-
-// Helper to call OpenAI with a primary deployment and gracefully fall back
-// to a default deployment if the primary deployment does not exist in the
-// target Azure OpenAI resource.
-async function getChatCompletionsWithFallback(client, primaryDeployment, fallbackDeployment, messages, options, context, label) {
-    try {
-        if (!primaryDeployment && !fallbackDeployment) {
-            throw new Error('No OpenAI deployment configured. Set aiModel or AZURE_OPENAI_DEPLOYMENT.');
-        }
-
-        const deploymentToUse = primaryDeployment || fallbackDeployment;
-        return await client.getChatCompletions(deploymentToUse, messages, options);
-    } catch (err) {
-        const message = (err && err.message ? err.message : '').toLowerCase();
-        const missingDeployment = message.includes('deployment') && message.includes('does not exist');
-
-        if (missingDeployment && fallbackDeployment && primaryDeployment && fallbackDeployment !== primaryDeployment) {
-            context.log.warn(`Primary OpenAI deployment "${primaryDeployment}" not found, retrying with fallback deployment "${fallbackDeployment}" for ${label}.`);
-            return await client.getChatCompletions(fallbackDeployment, messages, options);
-        }
-
-        throw err;
-    }
-}
+const {
+    resolveOpenAISettings,
+    getChatCompletionsWithFallback,
+} = require('../src/openai');
 
 module.exports = async function (context, req) {
     try {
-        const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
-        const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-        const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
         const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
         const cosmosKey = process.env.COSMOS_KEY;
         
@@ -45,31 +21,39 @@ module.exports = async function (context, req) {
             configData = cfg.data;
         } catch {}
 
-        const openAiSettings = configData?.globalSettings?.openAi || {};
-        const modelFromConfig = configData?.globalSettings?.aiModel;
-        const openAIEndpoint = 'https://client-fcs.cognitiveservices.azure.com/';
-        const deploymentId = modelFromConfig || defaultDeployment;
-        let openAIKey = keyPrimary;
-        if (openAiSettings.keySlot === 'secondary' && keySecondary) {
-            openAIKey = keySecondary;
-        }
-
-        const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
+        const settings = resolveOpenAISettings(configData || {});
         
         const { sessionId, category, response, currentTree } = req.body;
+        if (!sessionId || !category || !response || !currentTree) {
+            context.res = {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'sessionId, category, response, and currentTree are required' })
+            };
+            return;
+        }
 
-        // Store discovery response
-        await storeDiscoveryData(sessionId, category, response, container);
+        const { resource: session } = await container.item(sessionId, sessionId).read();
+        if (!session) {
+            context.res = {
+                status: 404,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Session not found' })
+            };
+            return;
+        }
+        if (!session.discoveryData || typeof session.discoveryData !== 'object') {
+            session.discoveryData = {};
+        }
+        session.discoveryData[category] = response;
 
         // Generate AI prompt for decision tree generation
         const prompt = buildDiscoveryPrompt(category, response, currentTree);
         
         // Call Azure OpenAI
-        const completion = await getChatCompletionsWithFallback(
-            openAIClient,
-            deploymentId,
-            defaultDeployment,
-            [
+        const completion = await getChatCompletionsWithFallback({
+            settings,
+            messages: [
                 {
                     role: 'system',
                     content: getSystemPrompt()
@@ -79,13 +63,13 @@ module.exports = async function (context, req) {
                     content: prompt
                 }
             ],
-            {
+            options: {
                 functions: [getTreeGenerationFunction()],
                 function_call: { name: 'generate_decision_nodes' }
             },
             context,
-            'discovery-process decision tree'
-        );
+            label: 'discovery-process decision tree',
+        });
 
         const functionCall = completion.choices[0].message.functionCall;
         const treeUpdates = JSON.parse(functionCall.arguments);
@@ -96,6 +80,8 @@ module.exports = async function (context, req) {
         // Determine if phase is complete
         const phaseComplete = checkPhaseCompletion(category, response);
         const nextPhase = phaseComplete ? getNextPhase(category) : null;
+
+        await container.item(sessionId, sessionId).replace(session);
 
         context.res = {
             status: 200,
@@ -292,14 +278,3 @@ function getNextPhase(currentCategory) {
     return currentIndex < phases.length - 1 ? phases[currentIndex + 1] : 'complete';
 }
 
-async function storeDiscoveryData(sessionId, category, response, container) {
-    const item = {
-        id: sessionId,
-        partitionKey: sessionId,
-        category,
-        response,
-        timestamp: new Date().toISOString()
-    };
-    
-    await container.items.upsert(item);
-}

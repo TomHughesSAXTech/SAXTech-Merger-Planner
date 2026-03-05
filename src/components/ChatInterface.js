@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
 import './ChatInterface.css';
+const API_BASE = '/api';
 
 const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryChange, initialMessages, completedCategories }) => {
   const [messages, setMessages] = useState([]);
@@ -62,7 +63,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
     // Load configuration on mount
     const loadConfig = async () => {
       try {
-        const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
+        const response = await fetch(`${API_BASE}/config-get`);
         if (!response.ok) {
           console.error('ChatInterface config-get failed: HTTP', response.status);
           if (!currentCategory) {
@@ -226,7 +227,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
 
     try {
       // Send to Azure Function for processing
-                const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/chat-process', {
+                const response = await fetch(`${API_BASE}/chat-process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

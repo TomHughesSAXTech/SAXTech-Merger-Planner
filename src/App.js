@@ -18,6 +18,7 @@ import NetworkDiagram from './components/NetworkDiagram';
 import FileUploadPanel from './components/FileUploadPanel';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
+const API_BASE = '/api';
 
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -106,7 +107,7 @@ function App() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
+      const response = await fetch(`${API_BASE}/config-get`);
       if (!response.ok) {
         console.error('Failed to load config: HTTP', response.status);
         return;
@@ -124,7 +125,7 @@ function App() {
 
   const initializeSession = async () => {
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/session-init', {
+      const response = await fetch(`${API_BASE}/session-init`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -234,13 +235,14 @@ function App() {
         [category]: data,
       }));
       updateCategoryNode(category, data);
+      setViewMode('network');
     }
   };
 
   const syncDiscoveryUpdate = async (category, data) => {
     if (!sessionId) return;
     try {
-      await fetch('https://maonboarding-functions.azurewebsites.net/api/discovery-update', {
+      await fetch(`${API_BASE}/discovery-update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, category, data }),
@@ -265,6 +267,7 @@ function App() {
 
   const handleDiscoveryMergeFromFile = (allDiscoveryData) => {
     setDiscoveryData(allDiscoveryData || {});
+    setViewMode('network');
     Object.entries(allDiscoveryData || {}).forEach(([category, data]) => {
       updateCategoryNode(category, data);
     });
@@ -291,8 +294,7 @@ function App() {
     if (!sessionId) return;
     setIsProcessing(true);
     try {
-      const { baseNodes, baseEdges } = filterBaseGraph();
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-generate', {
+      const response = await fetch(`${API_BASE}/plan-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -301,8 +303,19 @@ function App() {
           decisionTree: { nodes, edges }
         })
       });
-      
-      const plan = await response.json();
+      const raw = await response.text();
+      let plan = null;
+      try {
+        plan = raw ? JSON.parse(raw) : null;
+      } catch {
+        plan = null;
+      }
+      if (!response.ok) {
+        throw new Error(plan?.details || plan?.error || raw || `Plan generation failed (${response.status})`);
+      }
+      if (!plan) {
+        throw new Error('Plan generation returned an empty response');
+      }
       
       // Replace any existing plan nodes with the new plan
       if (plan.planNodes) {
@@ -331,7 +344,7 @@ function App() {
     if (!name) return;
     setIsSavingPlan(true);
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-save', {
+      const response = await fetch(`${API_BASE}/plan-history-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, name, nodes, edges })
@@ -353,7 +366,7 @@ function App() {
   const loadPlanHistory = async () => {
     if (!sessionId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-list', {
+      const response = await fetch(`${API_BASE}/plan-history-list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId })
@@ -373,7 +386,7 @@ function App() {
   const applyHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-load', {
+      const response = await fetch(`${API_BASE}/plan-history-load`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })
@@ -399,7 +412,7 @@ function App() {
   const deleteHistoryEntry = async (planId) => {
     if (!sessionId || !planId) return;
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/plan-history-delete', {
+      const response = await fetch(`${API_BASE}/plan-history-delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, planId })

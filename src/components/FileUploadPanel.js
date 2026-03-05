@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './FileUploadPanel.css';
+const API_BASE = '/api';
 
 const FileUploadPanel = ({ sessionId, onDiscoveryMerge }) => {
   const [uploads, setUploads] = useState([]);
@@ -20,7 +21,7 @@ const FileUploadPanel = ({ sessionId, onDiscoveryMerge }) => {
 
       try {
         const text = await file.text();
-        const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/file-ingest', {
+        const response = await fetch(`${API_BASE}/file-ingest`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

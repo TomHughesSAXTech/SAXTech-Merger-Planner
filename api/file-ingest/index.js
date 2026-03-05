@@ -1,23 +1,23 @@
-const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
+const {
+  resolveOpenAISettings,
+  getChatCompletionsWithFallback,
+  parseJsonResponse,
+} = require('../src/openai');
 
 async function loadConfig(cosmosClient) {
   try {
     const database = cosmosClient.database('MAOnboarding');
     const container = database.container('Configurations');
     const { resource: config } = await container.item('discovery_config', 'discovery_config').read();
-    return config.data;
-  } catch (error) {
+    return config?.data || null;
+  } catch {
     return null;
   }
 }
 
 module.exports = async function (context, req) {
   try {
-    const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
-    const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
-    const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-    const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
     const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
     const cosmosKey = process.env.COSMOS_KEY;
 
@@ -25,86 +25,105 @@ module.exports = async function (context, req) {
       context.res = {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Cosmos DB configuration missing' }
+        body: { error: 'Cosmos DB configuration missing' },
       };
       return;
     }
 
     const { sessionId, fileName, content } = req.body || {};
-    if (!sessionId || !content) {
+    if (!sessionId || typeof content !== 'string' || !content.trim()) {
       context.res = {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'sessionId and content are required' }
+        body: { error: 'sessionId and non-empty text content are required' },
       };
       return;
     }
 
     const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
     const database = cosmosClient.database('MAOnboarding');
-    const container = database.container('Sessions');
+    const sessions = database.container('Sessions');
 
-    const { resource: session } = await container.item(sessionId, sessionId).read();
+    const { resource: session } = await sessions.item(sessionId, sessionId).read();
     if (!session) {
       context.res = {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Session not found' }
+        body: { error: 'Session not found' },
       };
       return;
     }
 
-    const config = await loadConfig(cosmosClient);
-    const openAiSettings = config?.globalSettings?.openAi || {};
-    const modelFromConfig = config?.globalSettings?.aiModel;
-    const openAIEndpoint = openAiSettings.endpoint || baseEndpoint;
-    const deploymentName = modelFromConfig || defaultDeployment;
-    let openAIKey = keyPrimary;
-    if (openAiSettings.keySlot === 'secondary' && keySecondary) {
-      openAIKey = keySecondary;
-    }
-
-    const openAIClient = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
-
-    const truncated = typeof content === 'string' ? content.slice(0, 15000) : '';
-
-    const systemPrompt = `You are an assistant that reads IT discovery documents (spreadsheets, exports, network diagrams, inventories) and maps them into structured JSON for an M&A IT onboarding system.\n\nYou MUST output strictly valid JSON. Do not include explanations. Map content into these top-level keys when relevant:\n- general\n- server\n- workstation\n- security\n- backup\n- rmm\n- applications\n- telephony\n- vendor\n- network\n\nWithin each category, prefer flat key/value pairs where keys are machine-friendly (snake_case) but readable, like:\n- company_name\n- primary_poc { name, email, phone, role }\n- total_users\n- sites (array)\n- firewalls (array)\n- switches (array)\n- routers (array)\n- backup_frequency\n- edr_vendor\n- rmm_vendor\n\nIf a category has no information, omit it or use an empty object. If the same fact appears multiple times, deduplicate it.\n`;
-
-    const userPrompt = `FILE NAME: ${fileName || 'uploaded file'}\n\nCONTENT (may be truncated):\n${truncated}`;
-
-    const completion = await openAIClient.getChatCompletions(deploymentName, [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ], {});
-
-    let extracted;
-    try {
-      extracted = JSON.parse(completion.choices[0].message.content);
-    } catch (err) {
-      context.log.error('Failed to parse file-ingest JSON:', err);
-      context.res = {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Failed to parse AI output from file', details: err.message }
-      };
-      return;
-    }
-
-    if (!session.discoveryData) {
+    if (!session.discoveryData || typeof session.discoveryData !== 'object') {
       session.discoveryData = {};
     }
 
-    const categories = Object.keys(extracted || {});
-    categories.forEach((cat) => {
-      const incoming = extracted[cat] || {};
-      const existing = session.discoveryData[cat] || {};
-      session.discoveryData[cat] = {
-        ...existing,
-        ...incoming,
-      };
+    const config = await loadConfig(cosmosClient);
+    const settings = resolveOpenAISettings(config || {});
+
+    const truncated = content.slice(0, 18000);
+    const systemPrompt = `You are an assistant that reads IT discovery artifacts (interview transcripts, exports, inventories, and diagrams) and maps facts into structured JSON for an M&A IT onboarding platform.
+Return ONLY valid JSON. No markdown, no commentary.
+
+Top-level categories (include only categories with data):
+- general
+- server
+- workstation
+- security
+- backup
+- rmm
+- applications
+- telephony
+- vendor
+- network
+
+Use machine-friendly snake_case keys and preserve important details/quantities/vendors.`;
+
+    const userPrompt = `FILE: ${fileName || 'uploaded file'}
+CONTENT:
+${truncated}`;
+
+    const completion = await getChatCompletionsWithFallback({
+      settings,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      options: { maxTokens: 1800 },
+      context,
+      label: 'file-ingest extraction',
     });
 
-    await container.item(sessionId, sessionId).replace(session);
+    const extracted = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
+    if (!extracted || typeof extracted !== 'object' || Array.isArray(extracted)) {
+      context.res = {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: { error: 'Invalid AI extraction output format' },
+      };
+      return;
+    }
+
+    const categories = Object.keys(extracted);
+    categories.forEach((category) => {
+      const incoming = extracted[category];
+      const existing = session.discoveryData[category];
+
+      if (
+        incoming &&
+        typeof incoming === 'object' &&
+        !Array.isArray(incoming) &&
+        existing &&
+        typeof existing === 'object' &&
+        !Array.isArray(existing)
+      ) {
+        session.discoveryData[category] = { ...existing, ...incoming };
+      } else {
+        session.discoveryData[category] = incoming;
+      }
+    });
+
+    await sessions.item(sessionId, sessionId).replace(session);
 
     context.res = {
       status: 200,
@@ -112,15 +131,15 @@ module.exports = async function (context, req) {
       body: {
         sessionId,
         discoveryData: session.discoveryData,
-        updatedCategories: categories
-      }
+        updatedCategories: categories,
+      },
     };
   } catch (error) {
     context.log.error('Error in file-ingest:', error);
     context.res = {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: { error: 'Failed to ingest file', details: error.message }
+      body: { error: 'Failed to ingest file', details: error.message },
     };
   }
 };

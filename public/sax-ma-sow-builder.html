@@ -1270,7 +1270,7 @@
           setLoadingFromPlan(true);
           try {
             const resp = await fetch(
-              'https://maonboarding-functions.azurewebsites.net/api/sow-builder-data?sessionId=' +
+              '/api/sow-builder-data?sessionId=' +
               encodeURIComponent(sessionId)
             );
             if (!resp.ok) {

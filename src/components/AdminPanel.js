@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, Plus, Trash2, Save, RefreshCw, Download, Upload } from 'lucide-react';
 import './AdminPanel.css';
+const API_BASE = '/api';
 
 const AdminPanel = () => {
   const [config, setConfig] = useState(null);
@@ -15,7 +16,7 @@ const AdminPanel = () => {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('https://maonboarding-functions.azurewebsites.net/api/config-get');
+      const response = await fetch(`${API_BASE}/config-get`);
       const data = await response.json();
       const loadedConfig = data.config || getDefaultConfig();
       
@@ -89,7 +90,7 @@ const AdminPanel = () => {
         security: 0.20,
         communication: 0.15
       },
-      aiModel: 'gpt-4.1-mini',
+      aiModel: 'gpt-5.2-chat',
       maxContextMessages: 10,
       openAi: {
         endpoint: '',
@@ -101,7 +102,7 @@ const AdminPanel = () => {
   const saveConfig = async () => {
     setSaving(true);
     try {
-      await fetch('https://maonboarding-functions.azurewebsites.net/api/config-set', {
+      await fetch(`${API_BASE}/config-set`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config })
@@ -453,6 +454,7 @@ const AdminPanel = () => {
                     globalSettings: { ...config.globalSettings, aiModel: e.target.value }
                   })}
                 >
+                  <option value="gpt-5.2-chat">GPT-5.2 Chat</option>
                   <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
                   <option value="gpt-4.1">GPT-4.1</option>
                   <option value="gpt-4-turbo">GPT-4 Turbo</option>

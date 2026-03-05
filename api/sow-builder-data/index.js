@@ -1,43 +1,273 @@
-const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
 const { CosmosClient } = require('@azure/cosmos');
+const {
+  resolveOpenAISettings,
+  getChatCompletionsWithFallback,
+  parseJsonResponse,
+} = require('../src/openai');
 
-// Helper to call OpenAI with a primary deployment and gracefully fall back
-// to a default deployment if the primary deployment does not exist in the
-// target Azure OpenAI resource.
-async function getChatCompletionsWithFallback(client, primaryDeployment, fallbackDeployment, messages, options, context, label) {
+const PHASE_NAMES = [
+  'Phase 0: Pre-Migration & Discovery',
+  'Phase 1: Server Migration (Deliverable 1)',
+  'Phase 2: User Onboarding (Deliverable 2)',
+  'Phase 3: Data Migration/Lockdown/Backup (Deliverable 3)',
+  'Phase 4: Email/OneDrive/Website/DNS Cutover (Deliverable 4)',
+  'Phase 5: Post-Migration & Stabilization',
+];
+
+async function loadConfig(cosmosClient) {
   try {
-    if (!primaryDeployment && !fallbackDeployment) {
-      throw new Error('No OpenAI deployment configured. Set aiModel or AZURE_OPENAI_DEPLOYMENT.');
-    }
+    const database = cosmosClient.database('MAOnboarding');
+    const container = database.container('Configurations');
+    const { resource: config } = await container.item('discovery_config', 'discovery_config').read();
+    return config?.data || null;
+  } catch {
+    return null;
+  }
+}
 
-    const deploymentToUse = primaryDeployment || fallbackDeployment;
-    return await client.getChatCompletions(deploymentToUse, messages, options);
-  } catch (err) {
-    const message = (err && err.message ? err.message : '').toLowerCase();
-    const missingDeployment = message.includes('deployment') && message.includes('does not exist');
+function inferCompany(discoveryData = {}) {
+  return (
+    discoveryData?.general?.company_name ||
+    discoveryData?.general?.organization_name ||
+    discoveryData?.general?.client_name ||
+    ''
+  );
+}
 
-    if (missingDeployment && fallbackDeployment && primaryDeployment && fallbackDeployment !== primaryDeployment) {
-      context.log.warn(`Primary OpenAI deployment "${primaryDeployment}" not found, retrying with fallback deployment "${fallbackDeployment}" for ${label}.`);
-      return await client.getChatCompletions(fallbackDeployment, messages, options);
-    }
+function inferTotalUsers(discoveryData = {}) {
+  return Number(
+    discoveryData?.general?.total_users ||
+      discoveryData?.workstation?.workstation_count ||
+      discoveryData?.workstation?.total ||
+      0
+  );
+}
 
-    throw err;
+function createExecutionPlanFallback(discoveryData = {}) {
+  const totalUsers = inferTotalUsers(discoveryData);
+  const serverCount = Number(
+    discoveryData?.server?.server_count ||
+      (Array.isArray(discoveryData?.server?.servers) ? discoveryData.server.servers.length : 0) ||
+      2
+  );
+  const scale = Math.max(0.7, Math.min(5.5, (Math.max(totalUsers, 5) / 5) * 0.5 + (Math.max(serverCount, 2) / 2) * 0.5));
+
+  const withScale = (hours) => Math.max(1, Math.round(hours * scale * 2) / 2);
+
+  const phases = [
+    {
+      id: 'phase0',
+      name: PHASE_NAMES[0],
+      description: 'Discovery validation, architecture alignment, and rollout planning.',
+      tasks: [
+        { id: 'phase0-task1', name: 'Finalize discovery validation', description: 'Confirm source and target state assumptions.', hours: withScale(10), role: 'DIO', dependencies: [], risk: 'medium' },
+        { id: 'phase0-task2', name: 'Prepare migration runbook and communications plan', description: 'Prepare detailed SOP runbook and comms plan.', hours: withScale(8), role: 'CXO', dependencies: ['phase0-task1'], risk: 'medium' },
+      ],
+    },
+    {
+      id: 'phase1',
+      name: PHASE_NAMES[1],
+      description: 'Server migration execution and validation.',
+      tasks: [
+        { id: 'phase1-task1', name: 'Migrate server workloads', description: 'Migrate all identified workloads to target platform.', hours: withScale(44), role: 'SE', dependencies: ['phase0-task2'], risk: 'high' },
+        { id: 'phase1-task2', name: 'Apply hardening and baseline controls', description: 'Apply security baselines and monitoring controls.', hours: withScale(12), role: 'SE', dependencies: ['phase1-task1'], risk: 'medium' },
+      ],
+    },
+    {
+      id: 'phase2',
+      name: PHASE_NAMES[2],
+      description: 'User transition and endpoint onboarding.',
+      tasks: [
+        { id: 'phase2-task1', name: 'Provision identities and endpoint readiness', description: 'Configure identity, access, and endpoint state.', hours: withScale(22), role: 'SE', dependencies: ['phase1-task1'], risk: 'medium' },
+        { id: 'phase2-task2', name: 'Deliver onboarding and hypercare support', description: 'Provide post-cutover support and remediation.', hours: withScale(12), role: 'SE', dependencies: ['phase2-task1'], risk: 'medium' },
+      ],
+    },
+    {
+      id: 'phase3',
+      name: PHASE_NAMES[3],
+      description: 'Data and backup transition.',
+      tasks: [
+        { id: 'phase3-task1', name: 'Migrate and validate business data', description: 'Migrate data repositories and validate integrity.', hours: withScale(18), role: 'SE', dependencies: ['phase1-task1'], risk: 'high' },
+        { id: 'phase3-task2', name: 'Implement retention and backup controls', description: 'Validate backup/restore and retention policies.', hours: withScale(8), role: 'DIO', dependencies: ['phase3-task1'], risk: 'medium' },
+      ],
+    },
+    {
+      id: 'phase4',
+      name: PHASE_NAMES[4],
+      description: 'Messaging/collaboration and DNS cutover.',
+      tasks: [
+        { id: 'phase4-task1', name: 'Execute messaging and collaboration migration', description: 'Complete collaboration cutover and validation.', hours: withScale(28), role: 'SE', dependencies: ['phase2-task1', 'phase3-task1'], risk: 'high' },
+        { id: 'phase4-task2', name: 'Apply DNS/domain routing updates', description: 'Perform domain and DNS updates with validation.', hours: withScale(9), role: 'DIO', dependencies: ['phase4-task1'], risk: 'medium' },
+      ],
+    },
+    {
+      id: 'phase5',
+      name: PHASE_NAMES[5],
+      description: 'Stabilization and project close.',
+      tasks: [
+        { id: 'phase5-task1', name: 'Post-migration stabilization', description: 'Resolve residual issues and tune operations.', hours: withScale(24), role: 'SE', dependencies: ['phase4-task2'], risk: 'medium' },
+        { id: 'phase5-task2', name: 'Closeout and handoff', description: 'Deliver final SOP documentation and handoff package.', hours: withScale(8), role: 'CXO', dependencies: ['phase5-task1'], risk: 'low' },
+      ],
+    },
+  ];
+
+  return {
+    phases,
+    timeline: {
+      totalDays: Math.max(21, Math.round((phases.flatMap((p) => p.tasks).reduce((sum, t) => sum + t.hours, 0) / 8) * 1.35)),
+      milestones: [
+        { name: 'Discovery Locked', day: 7 },
+        { name: 'Core Migration Complete', day: 30 },
+        { name: 'Cutover Complete', day: 45 },
+      ],
+    },
+    risks: [
+      { description: 'Legacy dependencies discovered late', impact: 'high', mitigation: 'Use checkpoint-based validation and rollback gates.' },
+      { description: 'User disruption during transition', impact: 'medium', mitigation: 'Stage migrations and provide hypercare windows.' },
+    ],
+  };
+}
+
+function normalizeExecutionPlan(plan, discoveryData) {
+  const fallback = createExecutionPlanFallback(discoveryData);
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.phases) || !plan.phases.length) {
+    return fallback;
+  }
+
+  return {
+    phases: plan.phases.map((phase, pIdx) => ({
+      id: phase.id || `phase${pIdx}`,
+      name: phase.name || PHASE_NAMES[pIdx] || `Phase ${pIdx + 1}`,
+      description: phase.description || '',
+      tasks: (Array.isArray(phase.tasks) ? phase.tasks : []).map((task, tIdx) => {
+        if (typeof task === 'string') {
+          return {
+            id: `${phase.id || `phase${pIdx}`}-task${tIdx + 1}`,
+            name: task,
+            description: task,
+            hours: 4,
+            role: 'SE',
+            dependencies: [],
+            risk: 'medium',
+          };
+        }
+        return {
+          id: task.id || `${phase.id || `phase${pIdx}`}-task${tIdx + 1}`,
+          name: task.name || task.title || `Task ${tIdx + 1}`,
+          description: task.description || task.name || task.title || `Task ${tIdx + 1}`,
+          hours: Number.isFinite(Number(task.hours)) && Number(task.hours) > 0 ? Number(task.hours) : 4,
+          role: task.role || 'SE',
+          dependencies: Array.isArray(task.dependencies) ? task.dependencies : [],
+          risk: task.risk || 'medium',
+        };
+      }),
+    })),
+    timeline: plan.timeline || fallback.timeline,
+    risks: Array.isArray(plan.risks) ? plan.risks : fallback.risks,
+  };
+}
+
+function buildFallbackSow(executionPlan, discoveryData, session) {
+  const company = inferCompany(discoveryData);
+  let nextTaskId = 1;
+
+  const serviceItems = (executionPlan.phases || []).map((phase, phaseIndex) => ({
+    id: phaseIndex + 1,
+    phase: phase.name || `Phase ${phaseIndex + 1}`,
+    editable: true,
+    subItems: (Array.isArray(phase.tasks) ? phase.tasks : []).map((task) => ({
+      id: nextTaskId++,
+      description: task.name || task.description || 'Task',
+      resourceClass: String(task.role || 'SE').includes('CXO')
+        ? 'CXO'
+        : String(task.role || '').includes('DIO')
+        ? 'DIO'
+        : 'SE',
+      hours: Number(task.hours) || 4,
+      afterHours: false,
+      maintenanceRequired: false,
+      outageHours: 0,
+      detailSteps: task.description || '',
+      risk: task.risk || 'medium',
+    })),
+  }));
+
+  const timeline = executionPlan?.timeline?.totalDays
+    ? `${executionPlan.timeline.totalDays} days`
+    : '';
+
+  return {
+    coverData: {
+      projectName: session?.projectName || (company ? `${company} – M&A IT Onboarding` : ''),
+      customerId: session?.customerId || company || '',
+      description: 'Generated from M&A onboarding discovery and execution planning.',
+    },
+    scopeData: {
+      scopeDescription:
+        'Scope derived from discovery interview data and generated migration execution phases/tasks.',
+      deliverables: (executionPlan.phases || []).map((phase) => phase.name).filter(Boolean),
+      timeline,
+    },
+    serviceItems,
+    products: [],
+    rates: null,
+  };
+}
+
+async function synthesizeExecutionPlanIfMissing({
+  session,
+  discoveryData,
+  settings,
+  context,
+}) {
+  if (session.executionPlan && Array.isArray(session.executionPlan.phases) && session.executionPlan.phases.length) {
+    return session.executionPlan;
+  }
+
+  const synthPrompt = `You are a Senior Systems and Network Architect creating a migration execution plan from discovery data.
+Return ONLY valid JSON in this format:
+{
+  "phases":[
+    {"id":"phase0","name":"Phase 0: Pre-Migration & Discovery","description":"...","tasks":[{"id":"phase0-task1","name":"...","description":"...","hours":8,"role":"CXO|DIO|SE","dependencies":[],"risk":"low|medium|high|critical"}]}
+  ],
+  "timeline":{"totalDays":60,"milestones":[{"name":"...","day":15}]},
+  "risks":[{"description":"...","impact":"low|medium|high|critical","mitigation":"..."}]
+}
+
+Discovery JSON:
+${JSON.stringify(discoveryData, null, 2)}`;
+
+  try {
+    const completion = await getChatCompletionsWithFallback({
+      settings,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You produce practical M&A execution plans with role-based tasks and realistic estimated hours.',
+        },
+        { role: 'user', content: synthPrompt },
+      ],
+      options: { maxTokens: 2000 },
+      context,
+      label: 'sow-builder-data synthesize execution plan',
+    });
+    return normalizeExecutionPlan(parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}'), discoveryData);
+  } catch (error) {
+    context.log.warn('sow-builder-data failed to synthesize execution plan via AI:', error.message);
+    return createExecutionPlanFallback(discoveryData);
   }
 }
 
 module.exports = async function (context, req) {
   try {
-    const keyPrimary = process.env.AZURE_OPENAI_KEY_PRIMARY || process.env.AZURE_OPENAI_KEY;
-    const keySecondary = process.env.AZURE_OPENAI_KEY_SECONDARY;
-    const defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
     const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
     const cosmosKey = process.env.COSMOS_KEY;
-
     if (!cosmosEndpoint || !cosmosKey) {
       context.res = {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Cosmos DB configuration missing' }
+        body: { error: 'Cosmos DB configuration missing' },
       };
       return;
     }
@@ -47,315 +277,112 @@ module.exports = async function (context, req) {
       context.res = {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'sessionId is required' }
+        body: { error: 'sessionId is required' },
       };
       return;
     }
 
     const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
     const database = cosmosClient.database('MAOnboarding');
-    const container = database.container('Sessions');
+    const sessions = database.container('Sessions');
 
-    // Load configuration for OpenAI overrides
-    let configData = null;
-    try {
-      const configContainer = database.container('Configurations');
-      const { resource: cfg } = await configContainer.item('discovery_config', 'discovery_config').read();
-      configData = cfg.data;
-    } catch {}
-
-    const openAiSettings = configData?.globalSettings?.openAi || {};
-    const modelFromConfig = configData?.globalSettings?.aiModel;
-    const openAIEndpoint = 'https://client-fcs.cognitiveservices.azure.com/';
-    const deploymentName = modelFromConfig || defaultDeployment;
-    let openAIKey = keyPrimary;
-    if (openAiSettings.keySlot === 'secondary' && keySecondary) {
-      openAIKey = keySecondary;
-    }
-
-    const client = new OpenAIClient(openAIEndpoint, new AzureKeyCredential(openAIKey));
-
-    const { resource: session } = await container.item(sessionId, sessionId).read();
-    if (!session || !session.executionPlan) {
+    const { resource: session } = await sessions.item(sessionId, sessionId).read();
+    if (!session) {
       context.res = {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Execution plan not found for session' }
+        body: { error: 'Session not found' },
       };
       return;
     }
 
-    const executionPlan = session.executionPlan;
     const discoveryData = session.discoveryData || {};
+    const config = await loadConfig(cosmosClient);
+    const settings = resolveOpenAISettings(config || {});
 
-    // Pre-compute deliverable and phase hour rollups from executionPlan
-    function computeRollups(plan) {
-      const rollups = {
-        totalHours: 0,
-        byPhase: [],
-        byDeliverable: {
-          deliverable1: 0,
-          deliverable2: 0,
-          deliverable3: 0,
-          deliverable4: 0,
-          projectManagement: 0,
-        },
-      };
-      if (!plan || !Array.isArray(plan.phases)) return rollups;
+    let executionPlan = await synthesizeExecutionPlanIfMissing({
+      session,
+      discoveryData,
+      settings,
+      context,
+    });
+    executionPlan = normalizeExecutionPlan(executionPlan, discoveryData);
 
-      const d = rollups.byDeliverable;
+    session.executionPlan = executionPlan;
+    await sessions.item(sessionId, sessionId).replace(session);
 
-      plan.phases.forEach((phase) => {
-        const tasks = Array.isArray(phase.tasks) ? phase.tasks : [];
-        const hours = tasks.reduce((sum, t) => sum + (typeof t === 'object' && typeof t.hours === 'number' ? t.hours : 0), 0);
-        rollups.totalHours += hours;
-        rollups.byPhase.push({ id: phase.id, name: phase.name, hours });
-
-        const name = (phase.name || '').toLowerCase();
-        if (name.includes('server migration')) d.deliverable1 += hours;
-        else if (name.includes('user onboarding')) d.deliverable2 += hours;
-        else if (name.includes('data migration') || name.includes('lockdown')) d.deliverable3 += hours;
-        else if (name.includes('email') || name.includes('dns') || name.includes('onedrive') || name.includes('website')) d.deliverable4 += hours;
-        else if (name.includes('post-migration') || name.includes('stabilization') || name.includes('project management') || name.includes('pm')) d.projectManagement += hours;
-      });
-
-      return rollups;
-    }
-
-    const rollups = computeRollups(executionPlan);
-
-    // Helper: try to infer a customer/company name from discovery data
-    // small-firm, two-server, five-user migration. This is used to
-    // calibrate GPT's estimates so they stay in a realistic range.
-    const baselineHoursTemplate = `
-PROJECT TYPE EXAMPLE (REFERENCE ONLY)
-- Scenario: 2 servers, ~5 users, single main office plus small satellite.
-- High-level phases and typical effort:
-  - Phase 0: Pre-Migration & Discovery .......... ~12 hours
-  - Phase 1: Server Migration (Deliverable 1) ... ~42 hours
-  - Phase 2: User Onboarding (5 users) .......... ~22.5 hours
-  - Phase 3: Data Migration/Lockdown/Backup ..... ~18 hours
-  - Phase 4: Email/OneDrive/Website/DNS Cutover . ~27.5 hours
-  - Phase 5: Post-Migration & Stabilization ..... ~29.5 hours
-  - Total baseline effort ........................ ~150–155 hours
-
-HOURS BY DELIVERABLE (REFERENCE)
-- Deliverable 1 – Two Server Migration
-  - Includes Datto prep, VHD export/import, Azure VM build, security stack,
-    permissions, backup cutover, and server validation.
-  - Typical: ~56 hours total.
-- Deliverable 2 – User Onboarding (5 users / 5 laptops)
-  - Includes AD/M365 accounts, imaging, deployment, profile config,
-    and user orientation.
-  - Typical: ~27.5 hours total.
-- Deliverable 3 – Data Migration/Lockdown/Backup
-  - Includes S: drive validation, workstation data sweep, retention model,
-    backup validation, and legacy backup decommission.
-  - Typical: ~21 hours total.
-- Deliverable 4 – Email/OneDrive/Website/DNS Cutover
-  - Includes domain transfer, DNS/Proofpoint, BitTitan migrations,
-    OneDrive moves, and mail-flow testing.
-  - Typical: ~31.5 hours total.
-
-These numbers are not hard constraints, but for a similarly sized
-environment (2 servers, ~5 users) the total project estimate should
-usually stay within ~135–170 hours unless discovery clearly indicates
-substantially more or less work (larger data sets, many more users,
-complex VPN/site topology, heavy application remediation, etc.).`;
-
-    // Helper: try to infer a customer/company name from discovery data
-    function inferCustomerFromDiscovery(dd) {
-      try {
-        const values = [];
-        const stack = [dd];
-        while (stack.length) {
-          const cur = stack.pop();
-          if (!cur) continue;
-          if (typeof cur === 'string') {
-            values.push({ key: '', value: cur });
-          } else if (Array.isArray(cur)) {
-            cur.forEach(v => stack.push(v));
-          } else if (typeof cur === 'object') {
-            Object.entries(cur).forEach(([k, v]) => {
-              if (typeof v === 'string') {
-                values.push({ key: k.toLowerCase(), value: v });
-              } else {
-                stack.push(v);
-              }
-            });
-          }
-        }
-        // Prefer keys that look like company/client
-        const hit = values.find(x => x.key.includes('company') || x.key.includes('client') || x.key.includes('organization'));
-        return hit ? hit.value : null;
-      } catch {
-        return null;
-      }
-    }
-
-    const inferredCustomer = inferCustomerFromDiscovery(discoveryData);
-
-    const transformPrompt = `You are helping map an M&A IT onboarding execution plan into a structured
-SAX SOW builder schema used for estimating hours.
-
-You should respect the following pre-computed rollups from the
-execution plan when assigning hours to service items:
-- Total plan hours: ${rollups.totalHours}
-- Phase hours: ${JSON.stringify(rollups.byPhase)}
-- Deliverable hours (reference): ${JSON.stringify(rollups.byDeliverable)}
-
-Use these as constraints so that the sum of service item hours by phase
-and by deliverable matches these rollups as closely as possible.
-
-Use the following reference project as a calibration example for
-phase structure and realistic hours for a two-server, five-user
-migration. Do not copy client names, but mirror the level of detail
-and approximate effort when the discovered environment is of similar
-size:
-
-${baselineHoursTemplate}
-
-Now analyze the actual engagement details below.
-
-Input discovery data (JSON):\n${JSON.stringify(discoveryData, null, 2)}
-
-Input execution plan (JSON):\n${JSON.stringify(executionPlan, null, 2)}
-
-Target output JSON schema (no comments):
+    const transformPrompt = `Transform this execution plan into SOW builder JSON.
+Return ONLY JSON with schema:
 {
-  "coverData": {
-    "projectName": string,
-    "customerId": string,
-    "description": string
-  },
-  "scopeData": {
-    "scopeDescription": string,
-    "deliverables": string[],
-    "timeline": string
-  },
-  "serviceItems": [
-    {
-      "id": number,
-      "phase": string,
-      "editable": boolean,
-      "subItems": [
-        {
-          "id": number,
-          "description": string,
-          "resourceClass": "CXO" | "DIO" | "SE",
-          "hours": number,
-          "afterHours": boolean,
-          "maintenanceRequired": boolean,
-          "outageHours": number
-        }
-      ]
-    }
-  ]
+  "coverData":{"projectName":"string","customerId":"string","description":"string"},
+  "scopeData":{"scopeDescription":"string","deliverables":["string"],"timeline":"string"},
+  "serviceItems":[{"id":1,"phase":"string","editable":true,"subItems":[{"id":1,"description":"string","resourceClass":"CXO|DIO|SE","hours":8,"afterHours":false,"maintenanceRequired":false,"outageHours":0,"detailSteps":"string","risk":"low|medium|high|critical"}]}]
 }
 
-Rules:
-- Derive phases from the execution plan phases.
-- Derive tasks from phase tasks, grouping into subItems with realistic hour
-  estimates roughly in line with the reference project when the environment
-  is similar in size (2 servers, ~5 users). Scale hours up or down when
-  discovery clearly indicates more or fewer users, servers, or complexity.
-- Choose resourceClass based on the type of work: CXO for high-level/PM,
-  DIO for architecture/design, SE for technical implementation.
-- Keep JSON compact but valid. Return ONLY JSON.`;
+Discovery JSON:
+${JSON.stringify(discoveryData, null, 2)}
 
-    let sow;
+Execution Plan JSON:
+${JSON.stringify(executionPlan, null, 2)}`;
+
+    let sowPayload = null;
     try {
-      const completion = await getChatCompletionsWithFallback(
-        client,
-        deploymentName,
-        defaultDeployment,
-        [
-          { role: 'system', content: 'You are an M&A integration planning expert and SOW estimator.' },
-          { role: 'user', content: transformPrompt }
+      const completion = await getChatCompletionsWithFallback({
+        settings,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a Senior Systems and Network Architect producing SOW-ready phase/task estimations with practical hours.',
+          },
+          { role: 'user', content: transformPrompt },
         ],
-        {},
+        options: { maxTokens: 2200 },
         context,
-        'sow-builder-data SOW transform'
-      );
-
-      const content = completion.choices[0].message.content;
-      sow = JSON.parse(content);
-    } catch (err) {
-      context.log('Failed to transform execution plan to SOW via OpenAI, falling back to simple mapping:', err.message);
-
-      // Fallback: simple mapping without extra AI processing
-      const phases = executionPlan.phases || [];
-      let nextId = 1;
-      sow = {
-        coverData: {
-          projectName: session.projectName || (inferredCustomer ? `${inferredCustomer} – M&A IT Onboarding` : ''),
-          customerId: session.customerId || inferredCustomer || '',
-          description: 'Generated from M&A onboarding execution plan.'
-        },
-        scopeData: {
-          scopeDescription: 'High-level scope based on discovered systems and migration plan.',
-          deliverables: phases.map(p => p.name).filter(Boolean),
-          timeline: executionPlan.timeline?.estimatedDuration || ''
-        },
-        serviceItems: phases.map((phase, idx) => ({
-          id: idx + 1,
-          phase: phase.name || phase.id || `Phase ${idx + 1}`,
-          editable: true,
-          subItems: (phase.tasks || []).map((task, tIdx) => {
-            const desc = typeof task === 'string' ? task : (task.name || task.description || 'Task');
-            const role = typeof task === 'object' && task.role ? task.role : 'SE';
-            const resourceClass = role.toLowerCase().includes('director') || role.toLowerCase().includes('architect') ? 'DIO'
-              : role.toLowerCase().includes('cxo') || role.toLowerCase().includes('pm') ? 'CXO'
-              : 'SE';
-            const hours = typeof task === 'object' && typeof task.hours === 'number' ? task.hours : 4;
-            const risk = typeof task === 'object' && typeof task.risk === 'string' ? task.risk : '';
-            return {
-              id: nextId++,
-              description: desc,
-              resourceClass,
-              hours,
-              afterHours: false,
-              maintenanceRequired: false,
-              outageHours: 0,
-              risk
-            };
-          })
-        }))
-      };
+        label: 'sow-builder-data transform',
+      });
+      const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.serviceItems)) {
+        throw new Error('Invalid SOW payload returned by model');
+      }
+      sowPayload = parsed;
+    } catch (error) {
+      context.log.warn('sow-builder-data transform fallback triggered:', error.message);
+      sowPayload = buildFallbackSow(executionPlan, discoveryData, session);
     }
 
-    // Post-process SOW from either AI or fallback: ensure project/deliverables inferred when missing
-    try {
-      if (sow) {
-        if (sow.coverData) {
-          if (!sow.coverData.customerId && inferredCustomer) {
-            sow.coverData.customerId = inferredCustomer;
-          }
-          if (!sow.coverData.projectName && inferredCustomer) {
-            sow.coverData.projectName = `${inferredCustomer} – M&A IT Onboarding`;
-          }
-        }
-        if (sow.scopeData) {
-          if ((!sow.scopeData.deliverables || !sow.scopeData.deliverables.length) && Array.isArray(executionPlan.phases)) {
-            sow.scopeData.deliverables = executionPlan.phases.map(p => p.name || p.id).filter(Boolean);
-          }
-        }
-      }
-    } catch (ppErr) {
-      context.log('Post-processing SOW enhancements failed:', ppErr.message);
+    if (!sowPayload.coverData || typeof sowPayload.coverData !== 'object') {
+      sowPayload.coverData = {};
+    }
+    if (!sowPayload.scopeData || typeof sowPayload.scopeData !== 'object') {
+      sowPayload.scopeData = {};
+    }
+    if (!Array.isArray(sowPayload.serviceItems)) {
+      sowPayload.serviceItems = [];
+    }
+
+    if (!sowPayload.coverData.customerId) {
+      sowPayload.coverData.customerId = inferCompany(discoveryData) || '';
+    }
+    if (!sowPayload.coverData.projectName) {
+      const inferred = inferCompany(discoveryData);
+      sowPayload.coverData.projectName = inferred ? `${inferred} – M&A IT Onboarding` : '';
+    }
+    if (!Array.isArray(sowPayload.scopeData.deliverables) || !sowPayload.scopeData.deliverables.length) {
+      sowPayload.scopeData.deliverables = (executionPlan.phases || []).map((p) => p.name).filter(Boolean);
     }
 
     context.res = {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: sow
+      body: sowPayload,
     };
   } catch (error) {
     context.log.error('Error generating SOW builder data:', error);
     context.res = {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: { error: 'Failed to generate SOW builder data', details: error.message }
+      body: { error: 'Failed to generate SOW builder data', details: error.message },
     };
   }
 };

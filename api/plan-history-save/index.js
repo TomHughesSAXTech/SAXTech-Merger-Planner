@@ -65,12 +65,13 @@ module.exports = async function (context, req) {
         try { await containerClient.createIfNotExists({ access: 'container' }); } catch {}
         const id = uuidv4();
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
-        blobName = `${sessionId}/${ts}-${id}.json`;
-        const blobClient = containerClient.getBlockBlobClient(blobName);
+        const candidateBlobName = `${sessionId}/${ts}-${id}.json`;
+        const blobClient = containerClient.getBlockBlobClient(candidateBlobName);
         const body = JSON.stringify(historyPayload, null, 2);
         await blobClient.upload(body, Buffer.byteLength(body), {
           blobHTTPHeaders: { blobContentType: 'application/json' }
         });
+        blobName = candidateBlobName;
       } else {
         context.log('[plan-history-save] Storage history skipped (no SDK or connection string)');
       }
@@ -83,11 +84,16 @@ module.exports = async function (context, req) {
       id: entryId,
       name: name || `Plan ${new Date().toLocaleString()}`,
       createdAt: new Date().toISOString(),
-      blobName
+      blobName,
+      snapshot: {
+        executionPlan: historyPayload.executionPlan || null,
+        nodes: historyPayload.nodes || [],
+        edges: historyPayload.edges || []
+      }
     };
 
     const existingHistory = Array.isArray(session.planHistory) ? session.planHistory : [];
-    session.planHistory = [historyEntry, ...existingHistory];
+    session.planHistory = [historyEntry, ...existingHistory].slice(0, 30);
 
     await container.item(sessionId, sessionId).replace(session);
 
