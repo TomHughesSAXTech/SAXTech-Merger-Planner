@@ -91,9 +91,11 @@ async function getChatCompletionsWithFallback({
   }
   const { key, endpointCandidates, deployment, fallbackDeployment } = settings;
   let lastError = null;
-  const timeoutMs = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 10000);
+  const timeoutMs = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 4000);
+  const maxEndpointAttempts = Math.max(1, Number(process.env.OPENAI_MAX_ENDPOINT_ATTEMPTS || 1));
+  const candidatesToTry = endpointCandidates.slice(0, maxEndpointAttempts);
 
-  for (const endpoint of endpointCandidates) {
+  for (const endpoint of candidatesToTry) {
     const client = new OpenAIClient(endpoint, new AzureKeyCredential(key));
     const timeoutSignal =
       typeof AbortSignal !== 'undefined' &&
