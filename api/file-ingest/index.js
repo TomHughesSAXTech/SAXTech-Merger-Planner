@@ -16,6 +16,62 @@ async function loadConfig(cosmosClient) {
   }
 }
 
+function extractHeuristicDiscoveryFromText(rawContent = '') {
+  const text = String(rawContent || '');
+  const extracted = {};
+  const general = {};
+  const server = {};
+  const workstation = {};
+  const network = {};
+
+  const companyMatch = text.match(/(?:company(?:\s+name)?(?:\s+is)?|organization(?:\s+is)?|client(?:\s+is)?)\s*[:\-]?\s*([A-Z][A-Za-z0-9&'.,\- ]{2,80})/i);
+  const usersMatch = text.match(/(\d{1,5})\s+(?:users|employees|staff)\b/i);
+  const serverMatch = text.match(/(\d{1,5})\s+(?:physical\s+|virtual\s+)?servers?\b/i);
+  const officeMatch = text.match(/(\d{1,4})\s+(?:offices?|sites?|locations?)\b/i);
+
+  if (companyMatch && companyMatch[1]) {
+    general.company_name = companyMatch[1].trim().replace(/[.,;:]+$/, '');
+  }
+  if (usersMatch) {
+    general.total_users = Number(usersMatch[1]);
+    workstation.workstation_count = Number(usersMatch[1]);
+  }
+  if (officeMatch) {
+    general.sites = Number(officeMatch[1]);
+    network.site_count = Number(officeMatch[1]);
+  }
+  if (serverMatch) {
+    server.server_count = Number(serverMatch[1]);
+  }
+
+  if (/microsoft\s*365|office\s*365/i.test(text)) {
+    general.productivity_suite = 'Microsoft 365';
+    extracted.applications = {
+      ...(extracted.applications || {}),
+      collaboration_platform: 'Microsoft 365',
+    };
+  }
+  if (/vmware|hyper-v|esxi/i.test(text)) {
+    const virt = text.match(/(vmware|hyper-v|esxi)/i)?.[1];
+    if (virt) {
+      server.virtualization_platform = virt;
+    }
+  }
+  if (/cisco|meraki|fortinet|aruba|ubiquiti/i.test(text)) {
+    const vendor = text.match(/(cisco|meraki|fortinet|aruba|ubiquiti)/i)?.[1];
+    if (vendor) {
+      network.primary_network_vendor = vendor;
+    }
+  }
+
+  if (Object.keys(general).length) extracted.general = general;
+  if (Object.keys(server).length) extracted.server = server;
+  if (Object.keys(workstation).length) extracted.workstation = workstation;
+  if (Object.keys(network).length) extracted.network = network;
+
+  return extracted;
+}
+
 module.exports = async function (context, req) {
   try {
     const cosmosEndpoint = process.env.COSMOS_ENDPOINT;
@@ -83,25 +139,27 @@ Use machine-friendly snake_case keys and preserve important details/quantities/v
 CONTENT:
 ${truncated}`;
 
-    const completion = await getChatCompletionsWithFallback({
-      settings,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      options: { maxTokens: 1800 },
-      context,
-      label: 'file-ingest extraction',
-    });
+    let extracted = {};
+    try {
+      const completion = await getChatCompletionsWithFallback({
+        settings,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        options: { maxTokens: 1800 },
+        context,
+        label: 'file-ingest extraction',
+      });
 
-    const extracted = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
-    if (!extracted || typeof extracted !== 'object' || Array.isArray(extracted)) {
-      context.res = {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: { error: 'Invalid AI extraction output format' },
-      };
-      return;
+      const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Invalid AI extraction output format');
+      }
+      extracted = parsed;
+    } catch (error) {
+      context.log.warn('file-ingest AI extraction fallback triggered:', error.message);
+      extracted = extractHeuristicDiscoveryFromText(content);
     }
 
     const categories = Object.keys(extracted);

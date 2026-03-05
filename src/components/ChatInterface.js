@@ -238,12 +238,26 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
         })
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      let data = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || raw || `Chat request failed (${response.status})`);
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid chat response payload');
+      }
 
       // Add AI response
       addMessage({
         role: 'assistant',
-        content: data.response,
+        content: data.response || 'Acknowledged. I captured your response.',
         timestamp: new Date().toISOString()
       });
 

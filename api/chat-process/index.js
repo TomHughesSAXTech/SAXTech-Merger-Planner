@@ -18,6 +18,68 @@ const defaultCategoryPrompts = {
     'Ask about email systems, phone systems, collaboration tools, and user migration requirements.',
 };
 
+function buildFallbackAcknowledgement(message, category) {
+  const text = String(message || '').trim();
+  const short = text.length > 220 ? `${text.slice(0, 217)}...` : text;
+  const cleanCategory = String(category || 'current').replace(/_/g, ' ');
+  if (!short) {
+    return `Acknowledged. I captured your ${cleanCategory} discovery details.`;
+  }
+  return `Acknowledged for ${cleanCategory}: ${short}`;
+}
+
+function extractFactsHeuristically(message, category) {
+  const text = String(message || '');
+  const result = {};
+  const normalizedCategory = String(category || '').toLowerCase();
+
+  const companyMatch = text.match(/(?:company(?:\s+name)?(?:\s+is)?|organization(?:\s+is)?|client(?:\s+is)?)\s*[:\-]?\s*([A-Z][A-Za-z0-9&'.,\- ]{2,80})/i);
+  const usersMatch = text.match(/(\d{1,5})\s+(?:users|employees|staff)\b/i);
+  const sitesMatch = text.match(/(\d{1,4})\s+(?:offices?|sites?|locations?)\b/i);
+  const serversMatch = text.match(/(\d{1,5})\s+(?:physical\s+|virtual\s+)?servers?\b/i);
+
+  if (companyMatch && companyMatch[1]) {
+    result.company_name = companyMatch[1].trim().replace(/[.,;:]+$/, '');
+  }
+  if (usersMatch) {
+    result.total_users = Number(usersMatch[1]);
+  }
+  if (sitesMatch) {
+    result.sites = Number(sitesMatch[1]);
+  }
+  if (serversMatch) {
+    result.server_count = Number(serversMatch[1]);
+  }
+  if (/microsoft\s*365|office\s*365/i.test(text)) {
+    result.productivity_suite = 'Microsoft 365';
+  }
+  if (/remote[-\s]?capable|remote\s+work|hybrid/i.test(text)) {
+    result.work_model = 'hybrid_or_remote';
+  }
+
+  if (!Object.keys(result).length) {
+    return {};
+  }
+
+  if (normalizedCategory === 'server') {
+    return {
+      server_count: result.server_count || undefined,
+    };
+  }
+  if (normalizedCategory === 'workstation') {
+    return {
+      total_users: result.total_users || undefined,
+      work_model: result.work_model || undefined,
+    };
+  }
+  if (normalizedCategory === 'network') {
+    return {
+      sites: result.sites || undefined,
+    };
+  }
+  return Object.fromEntries(Object.entries(result).filter(([, value]) => value !== undefined));
+}
+
 async function loadConfig(cosmosClient) {
   try {
     const database = cosmosClient.database('MAOnboarding');
@@ -104,16 +166,21 @@ CRITICAL OUTPUT RULES:
       { role: 'user', content: message },
     ];
 
-    const completion = await getChatCompletionsWithFallback({
-      settings,
-      messages,
-      options: { maxTokens: 1500 },
-      context,
-      label: 'chat-process main response',
-    });
-    const response =
-      completion?.choices?.[0]?.message?.content?.trim() ||
-      'Acknowledged. I captured the latest discovery details.';
+    let response = buildFallbackAcknowledgement(message, category);
+    try {
+      const completion = await getChatCompletionsWithFallback({
+        settings,
+        messages,
+        options: { maxTokens: 1500 },
+        context,
+        label: 'chat-process main response',
+      });
+      response =
+        completion?.choices?.[0]?.message?.content?.trim() ||
+        response;
+    } catch (error) {
+      context.log.warn('chat-process main response fallback triggered:', error.message);
+    }
 
     session.messages.push(
       { role: 'user', content: message, timestamp: new Date().toISOString() },
@@ -122,6 +189,16 @@ CRITICAL OUTPUT RULES:
 
     let discoveryData = null;
     let categoryComplete = false;
+    const mergeCategoryFacts = (facts) => {
+      if (!facts || typeof facts !== 'object' || Array.isArray(facts) || Object.keys(facts).length === 0) {
+        return;
+      }
+      session.discoveryData[category] = {
+        ...(session.discoveryData[category] || {}),
+        ...facts,
+      };
+      discoveryData = session.discoveryData[category];
+    };
 
     const extractionPrompt = `Extract structured M&A IT discovery facts for category "${category}".
 Return ONLY valid JSON object with snake_case keys and category-relevant fields.
@@ -157,15 +234,10 @@ Preferred category mapping:
       });
 
       const extracted = parseJsonResponse(extractionCompletion?.choices?.[0]?.message?.content || '{}');
-      if (extracted && typeof extracted === 'object' && Object.keys(extracted).length > 0) {
-        session.discoveryData[category] = {
-          ...(session.discoveryData[category] || {}),
-          ...extracted,
-        };
-        discoveryData = session.discoveryData[category];
-      }
+      mergeCategoryFacts(extracted);
     } catch (error) {
-      context.log.warn('chat-process extraction parse failure:', error.message);
+      context.log.warn('chat-process extraction fallback triggered:', error.message);
+      mergeCategoryFacts(extractFactsHeuristically(message, category));
     }
 
     const completionCriteria = categoryConfig?.completionCriteria;
