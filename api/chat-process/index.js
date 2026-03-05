@@ -138,7 +138,12 @@ module.exports = async function (context, req) {
 
     const config = await loadConfig(cosmosClient);
     const categoryConfig = config?.categories?.find((c) => c.id === category);
-    const settings = resolveOpenAISettings(config || {});
+    let settings = null;
+    try {
+      settings = resolveOpenAISettings(config || {});
+    } catch (settingsError) {
+      context.log.warn('chat-process OpenAI settings unavailable, using fallback behavior:', settingsError.message);
+    }
     const maxContextMessages = config?.globalSettings?.maxContextMessages || 10;
 
     const basePrompt =
@@ -167,19 +172,21 @@ CRITICAL OUTPUT RULES:
     ];
 
     let response = buildFallbackAcknowledgement(message, category);
-    try {
-      const completion = await getChatCompletionsWithFallback({
-        settings,
-        messages,
-        options: { maxTokens: 1500 },
-        context,
-        label: 'chat-process main response',
-      });
-      response =
-        completion?.choices?.[0]?.message?.content?.trim() ||
-        response;
-    } catch (error) {
-      context.log.warn('chat-process main response fallback triggered:', error.message);
+    if (settings) {
+      try {
+        const completion = await getChatCompletionsWithFallback({
+          settings,
+          messages,
+          options: { maxTokens: 1500 },
+          context,
+          label: 'chat-process main response',
+        });
+        response =
+          completion?.choices?.[0]?.message?.content?.trim() ||
+          response;
+      } catch (error) {
+        context.log.warn('chat-process main response fallback triggered:', error.message);
+      }
     }
 
     session.messages.push(
@@ -216,27 +223,31 @@ Preferred category mapping:
 - vendor: msps[{name,services,contract_end}], vendor_partnerships
 - network: isp_primary, isp_secondary, vpn_brand, vpn_type, switch_brands, switch_count, wifi_system, wifi_ap_count, sites[{name,type,address}]`;
 
-    try {
-      const extractionCompletion = await getChatCompletionsWithFallback({
-        settings,
-        messages: [
-          { role: 'system', content: extractionPrompt },
-          {
-            role: 'user',
-            content: `Latest response: ${message}\n\nRecent context: ${recentContext
-              .map((m) => m.content)
-              .join(' ')}`,
-          },
-        ],
-        options: { maxTokens: 1200 },
-        context,
-        label: 'chat-process discovery extraction',
-      });
+    if (settings) {
+      try {
+        const extractionCompletion = await getChatCompletionsWithFallback({
+          settings,
+          messages: [
+            { role: 'system', content: extractionPrompt },
+            {
+              role: 'user',
+              content: `Latest response: ${message}\n\nRecent context: ${recentContext
+                .map((m) => m.content)
+                .join(' ')}`,
+            },
+          ],
+          options: { maxTokens: 1200 },
+          context,
+          label: 'chat-process discovery extraction',
+        });
 
-      const extracted = parseJsonResponse(extractionCompletion?.choices?.[0]?.message?.content || '{}');
-      mergeCategoryFacts(extracted);
-    } catch (error) {
-      context.log.warn('chat-process extraction fallback triggered:', error.message);
+        const extracted = parseJsonResponse(extractionCompletion?.choices?.[0]?.message?.content || '{}');
+        mergeCategoryFacts(extracted);
+      } catch (error) {
+        context.log.warn('chat-process extraction fallback triggered:', error.message);
+        mergeCategoryFacts(extractFactsHeuristically(message, category));
+      }
+    } else {
       mergeCategoryFacts(extractFactsHeuristically(message, category));
     }
 

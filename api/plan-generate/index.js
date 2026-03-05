@@ -422,7 +422,12 @@ module.exports = async function (context, req) {
     const decisionTree = body.decisionTree || { nodes: [], edges: [] };
 
     const config = await loadConfig(cosmosClient);
-    const settings = resolveOpenAISettings(config || {});
+    let settings = null;
+    try {
+      settings = resolveOpenAISettings(config || {});
+    } catch (settingsError) {
+      context.log.warn('plan-generate OpenAI settings unavailable, using fallback plan:', settingsError.message);
+    }
 
     const calibrationText = `Reference baseline for small engagements:
 - 2 servers, ~5 users, typical total effort ~135-170 hours.
@@ -473,25 +478,29 @@ Return ONLY valid JSON:
 }`;
 
     let plan = null;
-    try {
-      const completion = await getChatCompletionsWithFallback({
-        settings,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You create enterprise-grade M&A migration execution plans that are practical, role-based, and hour-estimable.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        options: { maxTokens: 2200 },
-        context,
-        label: 'plan-generate execution plan',
-      });
-      const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
-      plan = normalizePlan(parsed, discoveryData);
-    } catch (error) {
-      context.log.warn('plan-generate AI plan failed, using deterministic fallback:', error.message);
+    if (settings) {
+      try {
+        const completion = await getChatCompletionsWithFallback({
+          settings,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You create enterprise-grade M&A migration execution plans that are practical, role-based, and hour-estimable.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          options: { maxTokens: 2200 },
+          context,
+          label: 'plan-generate execution plan',
+        });
+        const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
+        plan = normalizePlan(parsed, discoveryData);
+      } catch (error) {
+        context.log.warn('plan-generate AI plan failed, using deterministic fallback:', error.message);
+        plan = createFallbackPlan(discoveryData);
+      }
+    } else {
       plan = createFallbackPlan(discoveryData);
     }
 

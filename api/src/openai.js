@@ -67,7 +67,10 @@ function shouldTryAnotherEndpoint(error) {
     message.includes('resource not found') ||
     message.includes('name or service not known') ||
     message.includes('enotfound') ||
-    message.includes('unauthorized')
+    message.includes('unauthorized') ||
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('aborted')
   );
 }
 
@@ -83,14 +86,27 @@ async function getChatCompletionsWithFallback({
   context,
   label = 'OpenAI call',
 }) {
+  if (!settings) {
+    throw new Error(`${label} failed: OpenAI settings unavailable.`);
+  }
   const { key, endpointCandidates, deployment, fallbackDeployment } = settings;
   let lastError = null;
+  const timeoutMs = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 10000);
 
   for (const endpoint of endpointCandidates) {
     const client = new OpenAIClient(endpoint, new AzureKeyCredential(key));
+    const timeoutSignal =
+      typeof AbortSignal !== 'undefined' &&
+      typeof AbortSignal.timeout === 'function' &&
+      timeoutMs > 0
+        ? AbortSignal.timeout(timeoutMs)
+        : undefined;
+    const mergedOptions = timeoutSignal
+      ? { ...options, abortSignal: options?.abortSignal || timeoutSignal }
+      : options;
     try {
       const primaryDeployment = deployment || fallbackDeployment;
-      return await client.getChatCompletions(primaryDeployment, messages, options);
+      return await client.getChatCompletions(primaryDeployment, messages, mergedOptions);
     } catch (error) {
       lastError = error;
 
@@ -103,7 +119,7 @@ async function getChatCompletionsWithFallback({
           context?.log?.warn?.(
             `[${label}] Deployment "${deployment}" missing on ${endpoint}; retrying with "${fallbackDeployment}".`
           );
-          return await client.getChatCompletions(fallbackDeployment, messages, options);
+          return await client.getChatCompletions(fallbackDeployment, messages, mergedOptions);
         } catch (fallbackError) {
           lastError = fallbackError;
         }

@@ -115,7 +115,12 @@ module.exports = async function (context, req) {
     }
 
     const config = await loadConfig(cosmosClient);
-    const settings = resolveOpenAISettings(config || {});
+    let settings = null;
+    try {
+      settings = resolveOpenAISettings(config || {});
+    } catch (settingsError) {
+      context.log.warn('file-ingest OpenAI settings unavailable, using heuristic extraction:', settingsError.message);
+    }
 
     const truncated = content.slice(0, 18000);
     const systemPrompt = `You are an assistant that reads IT discovery artifacts (interview transcripts, exports, inventories, and diagrams) and maps facts into structured JSON for an M&A IT onboarding platform.
@@ -140,25 +145,29 @@ CONTENT:
 ${truncated}`;
 
     let extracted = {};
-    try {
-      const completion = await getChatCompletionsWithFallback({
-        settings,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        options: { maxTokens: 1800 },
-        context,
-        label: 'file-ingest extraction',
-      });
+    if (settings) {
+      try {
+        const completion = await getChatCompletionsWithFallback({
+          settings,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          options: { maxTokens: 1800 },
+          context,
+          label: 'file-ingest extraction',
+        });
 
-      const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('Invalid AI extraction output format');
+        const parsed = parseJsonResponse(completion?.choices?.[0]?.message?.content || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Invalid AI extraction output format');
+        }
+        extracted = parsed;
+      } catch (error) {
+        context.log.warn('file-ingest AI extraction fallback triggered:', error.message);
+        extracted = extractHeuristicDiscoveryFromText(content);
       }
-      extracted = parsed;
-    } catch (error) {
-      context.log.warn('file-ingest AI extraction fallback triggered:', error.message);
+    } else {
       extracted = extractHeuristicDiscoveryFromText(content);
     }
 

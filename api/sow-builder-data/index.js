@@ -298,7 +298,12 @@ module.exports = async function (context, req) {
 
     const discoveryData = session.discoveryData || {};
     const config = await loadConfig(cosmosClient);
-    const settings = resolveOpenAISettings(config || {});
+    let settings = null;
+    try {
+      settings = resolveOpenAISettings(config || {});
+    } catch (settingsError) {
+      context.log.warn('sow-builder-data OpenAI settings unavailable, using fallback transformations:', settingsError.message);
+    }
 
     let executionPlan = await synthesizeExecutionPlanIfMissing({
       session,
