@@ -28,6 +28,10 @@ function extractHeuristicDiscoveryFromText(rawContent = '') {
   const usersMatch = text.match(/(\d{1,5})\s+(?:users|employees|staff)\b/i);
   const serverMatch = text.match(/(\d{1,5})\s+(?:physical\s+|virtual\s+)?servers?\b/i);
   const officeMatch = text.match(/(\d{1,4})\s+(?:offices?|sites?|locations?)\b/i);
+  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const phoneMatch = text.match(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/);
+  const pocMatch = text.match(/(?:primary\s+contact|primary\s+poc|point\s+of\s+contact)\s*[:\-]?\s*([A-Z][A-Za-z' .,-]{2,80})/i);
+  const roleMatch = text.match(/\b(?:role|title)\s*[:\-]?\s*([A-Za-z][A-Za-z0-9 /&-]{2,80})/i);
 
   if (companyMatch && companyMatch[1]) {
     general.company_name = companyMatch[1].trim().replace(/[.,;:]+$/, '');
@@ -63,6 +67,14 @@ function extractHeuristicDiscoveryFromText(rawContent = '') {
       network.primary_network_vendor = vendor;
     }
   }
+  if (pocMatch || emailMatch || phoneMatch || roleMatch) {
+    general.primary_poc = {
+      ...(pocMatch?.[1] ? { name: pocMatch[1].trim().replace(/[.,;:]+$/, '') } : {}),
+      ...(emailMatch?.[0] ? { email: emailMatch[0].trim() } : {}),
+      ...(phoneMatch?.[0] ? { phone: phoneMatch[0].trim() } : {}),
+      ...(roleMatch?.[1] ? { role: roleMatch[1].trim().replace(/[.,;:]+$/, '') } : {}),
+    };
+  }
 
   if (Object.keys(general).length) extracted.general = general;
   if (Object.keys(server).length) extracted.server = server;
@@ -86,7 +98,8 @@ module.exports = async function (context, req) {
       return;
     }
 
-    const { sessionId, fileName, content } = req.body || {};
+    const { sessionId, fileName, content, sourceType: requestedSourceType } = req.body || {};
+    const sourceType = requestedSourceType === 'transcript' ? 'transcript' : 'supplemental';
     if (!sessionId || typeof content !== 'string' || !content.trim()) {
       context.res = {
         status: 400,
@@ -123,7 +136,29 @@ module.exports = async function (context, req) {
     }
 
     const truncated = content.slice(0, 18000);
-    const systemPrompt = `You are an assistant that reads IT discovery artifacts (interview transcripts, exports, inventories, and diagrams) and maps facts into structured JSON for an M&A IT onboarding platform.
+    const systemPrompt = sourceType === 'transcript'
+      ? `You are an assistant that reads M&A discovery call transcripts and extracts factual IT details into structured JSON for onboarding.
+Return ONLY valid JSON. No markdown, no commentary.
+
+Top-level categories (include only categories with data):
+- general
+- server
+- workstation
+- security
+- backup
+- rmm
+- applications
+- telephony
+- vendor
+- network
+
+Transcript extraction priorities:
+- Capture explicit quantities (users, sites, servers, mailboxes, APs, switches, circuits).
+- Capture vendors/platforms (Microsoft 365, firewall/RMM/backup/VoIP vendors, ISPs).
+- Capture primary contact details (name, email, phone, role) when mentioned.
+- Capture constraints/timelines/compliance notes and place under general when relevant.
+- Use machine-friendly snake_case keys.`
+      : `You are an assistant that reads IT discovery artifacts (interview transcripts, exports, inventories, and diagrams) and maps facts into structured JSON for an M&A IT onboarding platform.
 Return ONLY valid JSON. No markdown, no commentary.
 
 Top-level categories (include only categories with data):
@@ -140,7 +175,8 @@ Top-level categories (include only categories with data):
 
 Use machine-friendly snake_case keys and preserve important details/quantities/vendors.`;
 
-    const userPrompt = `FILE: ${fileName || 'uploaded file'}
+    const userPrompt = `SOURCE_TYPE: ${sourceType}
+FILE: ${fileName || 'uploaded file'}
 CONTENT:
 ${truncated}`;
 
@@ -172,6 +208,7 @@ ${truncated}`;
     }
 
     const categories = Object.keys(extracted);
+    const completionHints = {};
     categories.forEach((category) => {
       const incoming = extracted[category];
       const existing = session.discoveryData[category];
@@ -188,6 +225,19 @@ ${truncated}`;
       } else {
         session.discoveryData[category] = incoming;
       }
+      const categoryValue = session.discoveryData[category];
+      completionHints[category] = {
+        fieldCount:
+          categoryValue && typeof categoryValue === 'object' && !Array.isArray(categoryValue)
+            ? Object.keys(categoryValue).length
+            : categoryValue != null
+            ? 1
+            : 0,
+        hasData:
+          categoryValue &&
+          ((typeof categoryValue === 'object' && Object.keys(categoryValue).length > 0) ||
+            (typeof categoryValue !== 'object' && String(categoryValue).trim().length > 0)),
+      };
     });
 
     await sessions.item(sessionId, sessionId).replace(session);
@@ -199,6 +249,8 @@ ${truncated}`;
         sessionId,
         discoveryData: session.discoveryData,
         updatedCategories: categories,
+        completionHints,
+        sourceType,
       },
     };
   } catch (error) {

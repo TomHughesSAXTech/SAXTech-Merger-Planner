@@ -3,7 +3,15 @@ import { Send, Bot, User, Loader } from 'lucide-react';
 import './ChatInterface.css';
 const API_BASE = '/api';
 
-const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryChange, initialMessages, completedCategories }) => {
+const ChatInterface = ({
+  sessionId,
+  onDiscoveryUpdate,
+  currentPhase,
+  onCategoryChange,
+  initialMessages,
+  completedCategories,
+  autoFillEvent,
+}) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -12,6 +20,7 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
   const [askedQuestions, setAskedQuestions] = useState([]);
   const [resumed, setResumed] = useState(false);
   const resumeQuestionAsked = useRef(false);
+  const lastAutoFillEventId = useRef(null);
   // Detect if this is a session-resume load (sessionId in URL or localStorage)
   const isResumeMode = useRef((() => {
     const url = new URL(window.location.href);
@@ -147,6 +156,68 @@ const ChatInterface = ({ sessionId, onDiscoveryUpdate, currentPhase, onCategoryC
       onCategoryChange(currentCategory);
     }
   }, [currentCategory, onCategoryChange]);
+
+  useEffect(() => {
+    if (!autoFillEvent?.id || !config) return;
+    if (lastAutoFillEventId.current === autoFillEvent.id) return;
+    lastAutoFillEventId.current = autoFillEvent.id;
+
+    const categories = config?.config?.categories?.map((c) => c.id) || Object.keys(defaultDiscoveryQuestions);
+    const completedFromTranscript = Array.isArray(autoFillEvent.categories)
+      ? autoFillEvent.categories.filter((id) => categories.includes(id))
+      : [];
+
+    if (!completedFromTranscript.length) return;
+
+    setAskedQuestions((prev) => {
+      const existing = new Set(prev.map((q) => `${q.category}::${q.question}`));
+      const merged = [...prev];
+      completedFromTranscript.forEach((categoryId) => {
+        const categoryConfig = config?.config?.categories?.find((c) => c.id === categoryId);
+        const questions = categoryConfig?.questions || defaultDiscoveryQuestions[categoryId] || [];
+        questions.forEach((question) => {
+          const key = `${categoryId}::${question}`;
+          if (!existing.has(key)) {
+            existing.add(key);
+            merged.push({ category: categoryId, question });
+          }
+        });
+      });
+      return merged;
+    });
+
+    const completedNames = completedFromTranscript.map((categoryId) => {
+      const categoryConfig = config?.config?.categories?.find((c) => c.id === categoryId);
+      return categoryConfig?.name || categoryId;
+    });
+
+    const shouldAdvanceCurrentCategory =
+      currentCategory && completedFromTranscript.includes(currentCategory);
+    const nextIncompleteCategory = categories.find(
+      (categoryId) => !completedFromTranscript.includes(categoryId)
+    );
+
+    if (shouldAdvanceCurrentCategory && nextIncompleteCategory) {
+      const nextConfig = config?.config?.categories?.find((c) => c.id === nextIncompleteCategory);
+      const nextName = nextConfig?.name || nextIncompleteCategory;
+      setCurrentCategory(nextIncompleteCategory);
+      addMessage({
+        role: 'assistant',
+        content: `Transcript parsed and auto-filled: ${completedNames.join(', ')}. We'll continue with ${nextName}.`,
+        timestamp: new Date().toISOString(),
+      });
+      setTimeout(() => {
+        askNextQuestion(nextIncompleteCategory);
+      }, 500);
+      return;
+    }
+
+    addMessage({
+      role: 'assistant',
+      content: `Transcript parsed and auto-filled: ${completedNames.join(', ')}.`,
+      timestamp: new Date().toISOString(),
+    });
+  }, [autoFillEvent, config, currentCategory]);
 
   useEffect(() => {
     // Initialize with welcome message only for NEW sessions

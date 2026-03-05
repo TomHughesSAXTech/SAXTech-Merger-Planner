@@ -71,6 +71,7 @@ function App() {
   const [planHistory, setPlanHistory] = useState([]);
   const [showPlanHistory, setShowPlanHistory] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [transcriptAutoFillEvent, setTranscriptAutoFillEvent] = useState(null);
 
   const clearPersistedSession = () => {
     try {
@@ -92,6 +93,7 @@ function App() {
     setCurrentPhase(null);
     setPlanHistory([]);
     setShowPlanHistory(false);
+    setTranscriptAutoFillEvent(null);
     setViewMode('network');
     setNodes([]);
     setEdges([]);
@@ -265,12 +267,20 @@ function App() {
     syncDiscoveryUpdate(category, updatedCategoryData);
   };
 
-  const handleDiscoveryMergeFromFile = (allDiscoveryData) => {
+  const handleDiscoveryMergeFromFile = (allDiscoveryData, ingestMeta = {}) => {
     setDiscoveryData(allDiscoveryData || {});
     setViewMode('network');
     Object.entries(allDiscoveryData || {}).forEach(([category, data]) => {
       updateCategoryNode(category, data);
     });
+    if (ingestMeta?.sourceType === 'transcript') {
+      setTranscriptAutoFillEvent({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        categories: Array.isArray(ingestMeta.updatedCategories) ? ingestMeta.updatedCategories : [],
+        fileName: ingestMeta.fileName || null,
+        completionHints: ingestMeta.completionHints || {},
+      });
+    }
   };
 
   const handleCategoryChange = (categoryId) => {
@@ -536,6 +546,7 @@ function App() {
             onDiscoveryUpdate={handleDiscoveryResponse}
             currentPhase={currentPhase}
             onCategoryChange={handleCategoryChange}
+            autoFillEvent={transcriptAutoFillEvent}
           />
           <DiscoveryPanel 
             discoveryData={discoveryData}

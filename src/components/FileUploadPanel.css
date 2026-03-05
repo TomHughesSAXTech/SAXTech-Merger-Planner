@@ -3,6 +3,20 @@
   padding: 0.75rem 1rem;
   border-top: 1px solid #e1dfdd;
 }
+.file-upload-block {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #e1dfdd;
+  border-radius: 6px;
+}
+
+.transcript-block {
+  background: #f8fbff;
+}
+
+.supplemental-block {
+  background: #ffffff;
+}
 
 .file-upload-header {
   font-weight: 600;
@@ -13,6 +27,32 @@
   font-size: 0.75rem;
   color: #605e5c;
   margin-bottom: 0.5rem;
+}
+
+.transcript-textarea {
+  width: 100%;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #c8c6c4;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  resize: vertical;
+}
+
+.transcript-ingest-btn {
+  border: 1px solid #0078d4;
+  background: #0078d4;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.transcript-ingest-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .file-upload-list {
