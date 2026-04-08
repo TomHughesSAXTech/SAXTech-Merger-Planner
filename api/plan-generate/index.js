@@ -439,8 +439,9 @@ module.exports = async function (context, req) {
   - Email/OneDrive/DNS cutover
   - Post-migration stabilization`;
 
-    const prompt = `You are a Senior Systems and Network Architect with 30+ years of professional services scoping experience.
-Build an actionable M&A migration execution plan for SOW generation.
+    const prompt = `You are a Senior Systems and Network Architect at SAX Technology Advisors with 30+ years of professional services scoping experience.
+Build an actionable M&A migration execution plan for lifting-and-shifting this acquisition target into SAX Advisory Group's managed infrastructure.
+Target state: SAX Advisory Group tenant (Microsoft 365, Azure AD/Entra, Intune, Defender, Datto/BCDR). Server workloads go to Azure IaaS or SAX shared infra. Firewall cutover uses FortiGate or Meraki patterns.
 
 ${calibrationText}
 

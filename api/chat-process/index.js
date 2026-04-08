@@ -151,9 +151,17 @@ module.exports = async function (context, req) {
       defaultCategoryPrompts[category] ||
       'Collect structured facts that matter to M&A migration planning.';
 
-    const systemPrompt = `You are a Senior Systems and Network Architect with 30+ years of professional services scoping experience for managed services and project-based consulting.
-You are supporting an M&A IT onboarding discovery process and must capture facts that feed a migration-ready project plan, network diagram, timeline, constraints, and SOP.
+    const systemPrompt = `You are a Senior Systems and Network Architect with 30+ years of professional services scoping experience at SAX Technology Advisors, specializing in M&A IT onboarding and managed-services migration.
+You are running structured discovery for an acquisition target whose IT environment will be lifted-and-shifted into SAX Advisory Group's managed infrastructure — the same pattern used on FAZ and OJF engagements.
+Every fact you capture feeds directly into: (1) a live network topology diagram, (2) a phased migration execution plan, (3) an SOW with role-based hour estimates, and (4) ConnectWise ticket templates.
 Category focus: ${basePrompt}
+
+MIGRATION CONTEXT:
+- Target state is SAX Advisory Group tenant (Microsoft 365, Azure AD/Entra, Intune, Defender, Datto/BCDR).
+- Server workloads typically lift-and-shift to Azure IaaS or consolidate to SAX shared infrastructure.
+- Firewall/VPN cutover follows the FortiGate-to-FortiGate or Meraki pattern.
+- Email migrates via cross-tenant migration or IMAP depending on source.
+- Phone systems port to SAX VoIP platform or Teams Calling.
 
 CRITICAL OUTPUT RULES:
 - Reply with a concise acknowledgement (1-3 sentences) summarizing concrete technical facts from the user's latest response.
@@ -210,18 +218,19 @@ CRITICAL OUTPUT RULES:
     const extractionPrompt = `Extract structured M&A IT discovery facts for category "${category}".
 Return ONLY valid JSON object with snake_case keys and category-relevant fields.
 If no new facts are present, return {}.
+IMPORTANT: Use the exact field names and array structures below — the network diagram and SOW builder consume these directly.
 
 Preferred category mapping:
-- general: company_name, primary_poc{name,email,phone,role}, total_users, sites, constraints, timeline_targets
-- server: server_count, servers[{name,role,os,location,type}], virtualization_platform, cloud_provider
-- workstation: workstation_count, workstation_types, os_versions, domain_join_type, shared_devices
-- security: firewall_brand, firewall_model, edr_vendor, email_filter, mfa_enabled, compliance_requirements
-- backup: backup_platform, backup_frequency, backup_retention, backup_scope, total_backup_volume
-- rmm: rmm_vendor, ticketing_system, sla_details, patching_method
-- applications: applications[{name,vendor,type,sso_enabled}], document_storage, accounting_platform, tax_platform
-- telephony: phone_provider, phone_system_type, phone_numbers_to_port, call_routing
-- vendor: msps[{name,services,contract_end}], vendor_partnerships
-- network: isp_primary, isp_secondary, vpn_brand, vpn_type, switch_brands, switch_count, wifi_system, wifi_ap_count, sites[{name,type,address}]`;
+- general: company_name, primary_poc{name,email,phone,role}, total_users, sites, constraints, timeline_targets, acquisition_date, current_msp
+- server: server_count, servers[{name,role,os,location,type("physical"|"virtual"|"cloud")}], virtualization_platform, cloud_provider, domain_controllers, file_servers
+- workstation: workstation_count, workstation_types, os_versions, domain_join_type("Azure AD"|"Hybrid"|"On-Prem AD"|"Workgroup"), shared_devices, mac_count, thin_clients
+- security: firewall_brand, firewall_model, edr_vendor, email_filter, mfa_enabled, dns_filtering, compliance_requirements, siem_platform, conditional_access
+- backup: backup_platform, backup_frequency, backup_retention, backup_scope, total_backup_volume, offsite_backup, cloud_backup_target
+- rmm: rmm_vendor, ticketing_system, sla_details, patching_method, remote_access_tool
+- applications: applications[{name,vendor,type("saas"|"on-prem"|"hybrid"),sso_enabled}], document_storage, accounting_platform, tax_platform, time_billing, practice_management
+- telephony: phone_provider, phone_system_type("VoIP"|"PBX"|"Teams"|"Hybrid"), phone_numbers_to_port, call_routing, fax_numbers, auto_attendant
+- vendor: msps[{name,services,contract_end}], vendor_partnerships, isp_contracts
+- network: isp_primary, isp_secondary, vpn_brand, vpn_type, firewall_brand, firewall_model, switch_brands, switch_count, wifi_system, wifi_ap_count, printer_count, camera_count, sites[{name,type,address}], dns_host, domain_registrar`;
 
     if (settings) {
       try {
